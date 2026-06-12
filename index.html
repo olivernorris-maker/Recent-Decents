@@ -185,7 +185,7 @@ async function login(){
   localStorage.setItem('rd_verifier', verifier);
   var challenge=await sha256b64(verifier);
   var p=new URLSearchParams({client_id:CLIENT_ID, response_type:'code', redirect_uri:REDIRECT_URI,
-    code_challenge_method:'S256', code_challenge:challenge, scope:SCOPES});
+    code_challenge_method:'S256', code_challenge:challenge, scope:SCOPES, show_dialog:'true'});
   location.href='https://accounts.spotify.com/authorize?'+p.toString();
 }
 
@@ -303,6 +303,7 @@ async function enrichTracks(rows){
       var chunk=rows.slice(i,i+12);
       var q=chunk.map(function(r){ return (r.Artist||'').split(',')[0].trim()+'~~'+(r.Track||''); }).join('||');
       var data=await apiGet('action=enrich&q='+encodeURIComponent(q));
+      if(data && data.rows){ toast('Backend is out of date \u2014 redeploy Code.gs as a New version'); return; }
       chunk.forEach(function(r){
         var d=data&&data[lfmKey(r)];
         if(d){
