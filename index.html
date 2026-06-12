@@ -137,12 +137,24 @@
 
 <script>
 /* ============================================================
-   STEP 5 — PASTE YOUR TWO VALUES BETWEEN THE QUOTES BELOW.
-   (The guide tells you where each one comes from.)
+   PASTE YOUR VALUES BETWEEN THE QUOTES BELOW.
+
+   The first two you already have.
+
+   The three PLAYLIST LINKS: in Spotify, open the playlist, tap the
+   three dots ⋮ → Share → Copy link, and paste it between the quotes.
+   These make playlist matching exact — no name guessing.
    ============================================================ */
 var CLIENT_ID      = '6ce6cf4939f0479a81f248978259cdbf';
 var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjuAnaMshKcnqyeCJyWgmWWv2zaARIfUEKqcFJ_AkwlXFet_kNu9LJd5iCY9nPwsHu/exec';
+
+var SHAZAM_PLAYLIST_LINK         = 'https://open.spotify.com/playlist/56jpOfYps9xIN8djlrDqAU?si=87559684d3e7421b&pt=02726f1d181d5aee64f6f4bc47cd1394';   /* link to "My Shazam Tracks" */
+var RECENT_DECENTS_PLAYLIST_LINK = 'https://open.spotify.com/playlist/32XNkPX0wHDzOpgh7V2Xk0?si=bf9abbb47049483a';   /* link to your "Recent Decents" */
+var ON_ROTATION_PLAYLIST_LINK    = 'https://open.spotify.com/playlist/2BQk3EVHsi596qP2lVwpxr?si=ad3b38a11d8b4a75';   /* link to your "On Rotation" */
 /* ============================================================ */
+
+/* pull the playlist ID out of a pasted Spotify link (handles ?si=... etc.) */
+function plId(link){ var m=String(link||'').match(/playlist[\/:]([A-Za-z0-9]+)/); return m?m[1]:''; }
 
 var REDIRECT_URI = location.origin + location.pathname;
 var SCOPES = 'user-library-read playlist-read-private playlist-modify-private playlist-modify-public';
@@ -276,8 +288,9 @@ async function findPlaylistContains(sub){
   }
   return null;
 }
-async function getPlaylist(name, source, since, fuzzy){
-  var id = fuzzy ? await findPlaylistContains(name) : await findPlaylistId(name);
+async function getPlaylist(name, source, since, fuzzy, link){
+  var id = plId(link);
+  if(!id) id = fuzzy ? await findPlaylistContains(name) : await findPlaylistId(name);
   if(!id) return [];
   return pageItems('/playlists/'+id+'/tracks?limit=100', source, since, false);
 }
@@ -329,8 +342,9 @@ async function spw(path, method, body){
   var txt=await res.text(); try{ return JSON.parse(txt); }catch(e){ return {}; }
 }
 async function myId(){ if(STATE._me) return STATE._me; var d=await sp('/me'); STATE._me=d.id; return d.id; }
-async function ensurePlaylist(name){
-  var id=await findPlaylistId(name);
+async function ensurePlaylist(name, link){
+  var id=plId(link);
+  if(!id) id=await findPlaylistId(name);
   if(!id) id=await findPlaylistContains(String(name).toLowerCase());
   if(id) return id;
   var uid=await myId();
@@ -354,21 +368,25 @@ async function plRemove(id, uris){
 async function addToRotation(row, via){
   try{
     if(STATE.rotation.some(function(x){return x.URI===row.URI;})) return;
-    var id=await ensurePlaylist(ON_ROTATION_NAME);
+    var id=await ensurePlaylist(ON_ROTATION_NAME, ON_ROTATION_PLAYLIST_LINK);
     var have=await playlistUris(id);
     if(have.indexOf(row.URI)===-1) await plAdd(id,[row.URI]);
     var entry={URI:row.URI, Artist:row.Artist, Track:row.Track, Added:new Date().toISOString(), Via:via||'Love'};
     STATE.rotation.push(entry);
     writeSheet({action:'rotationAdd', uri:row.URI, artist:row.Artist, track:row.Track, added:entry.Added, via:entry.Via});
     toast('Added to On Rotation');
-  }catch(e){ toast(e.message==='scope'?'Reconnect Spotify for playlist access':'Could not reach On Rotation'); }
+  }catch(e){
+    if(e.message==='scope'){
+      alert('Spotify hasn\u2019t given the app playlist permission yet.\n\nTap "Reconnect Spotify" at the bottom of the app, approve, then set the track to Love again.');
+    } else { toast('Could not reach On Rotation'); }
+  }
 }
 async function runExpiry(){
   try{
     var cutoff=Date.now()-ROTATION_DAYS*86400000;
     var due=STATE.rotation.filter(function(x){ return x.Added && Date.parse(x.Added) < cutoff; });
     if(!due.length) return;
-    var id=await findPlaylistId(ON_ROTATION_NAME); if(!id) return;
+    var id=plId(ON_ROTATION_PLAYLIST_LINK)||await findPlaylistId(ON_ROTATION_NAME); if(!id) return;
     await plRemove(id, due.map(function(x){return x.URI;}));
     due.forEach(function(x){ writeSheet({action:'rotationRemove', uri:x.URI}); });
     var goneUris={}; due.forEach(function(x){ goneUris[x.URI]=1; });
@@ -416,7 +434,7 @@ async function archiveMonth(){
   if(!confirm('Archive the current Recent Decents playlist into a dated copy, then empty it for the new month?')) return;
   toast('Archiving…');
   try{
-    var id=await findPlaylistId(RECENT_DECENTS_NAME);
+    var id=plId(RECENT_DECENTS_PLAYLIST_LINK)||await findPlaylistId(RECENT_DECENTS_NAME);
     if(!id){ toast('No "Recent Decents" playlist found'); return; }
     var uris=await playlistUris(id);
     if(!uris.length){ toast('Recent Decents is already empty'); return; }
@@ -436,8 +454,13 @@ async function doSync(btn){
     var existing={}; STATE.rows.forEach(function(r){ if(r.URI) existing[r.URI]=1; });
     var found=[];
     found=found.concat(await getLiked(since));
-    found=found.concat(await getPlaylist('shazam','Shazam', since, true));
-    found=found.concat(await getPlaylist('Recent Decents','Recent Decents', since));
+    var shaz=await getPlaylist('shazam','Shazam', since, true, SHAZAM_PLAYLIST_LINK);
+    if(!shaz.length && !plId(SHAZAM_PLAYLIST_LINK)){
+      var shazId=await findPlaylistContains('shazam');
+      if(!shazId) toast('Shazam playlist not found — paste its link in settings');
+    }
+    found=found.concat(shaz);
+    found=found.concat(await getPlaylist('Recent Decents','Recent Decents', since, false, RECENT_DECENTS_PLAYLIST_LINK));
     var seen={}, fresh=[];
     found.forEach(function(t){ if(t&&t.URI&&!existing[t.URI]&&!seen[t.URI]){ seen[t.URI]=1; fresh.push(t); } });
     if(fresh.length){
