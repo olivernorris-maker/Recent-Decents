@@ -648,20 +648,7 @@ function render(){
 /* ---------- forensic diagnostic ---------- */
 async function debugPlaylists(){
   var L=[]; var t=await getToken();
-  L.push('Token: '+(t?'ok':'MISSING'));
-  /* 1. page through ALL playlists, find targets by name */
-  try{
-    var all=[], url='/me/playlists?limit=50';
-    while(url){ var d=await sp(url); (d.items||[]).forEach(function(p){all.push(p);});
-      url=d.next?d.next.replace('https://api.spotify.com/v1',''):null; }
-    L.push('Total playlists on account: '+all.length);
-    ['shazam','recent decents','on rotation'].forEach(function(n){
-      var hits=all.filter(function(p){return p.name&&p.name.toLowerCase().indexOf(n)>-1;});
-      if(!hits.length){ L.push('No playlist named like "'+n+'"'); }
-      hits.forEach(function(p){ L.push('"'+p.name+'" id='+p.id+' ('+(p.tracks?p.tracks.total:'?')+' tracks, owner '+(p.owner?p.owner.id:'?')+')'); });
-    });
-  }catch(e){ L.push('Playlist list error: '+e.message); }
-  /* 2. raw status for each pasted ID */
+  /* 1. THE VERDICT: raw status for each pasted ID */
   var pairs=[['Shazam',SHAZAM_PLAYLIST_LINK],['RD',RECENT_DECENTS_PLAYLIST_LINK],['OnRot',ON_ROTATION_PLAYLIST_LINK]];
   for(var i=0;i<pairs.length;i++){
     var id=plId(pairs[i][1]);
@@ -670,10 +657,26 @@ async function debugPlaylists(){
       var res=await fetch('https://api.spotify.com/v1/playlists/'+id+'/tracks?limit=3',
         {headers:{Authorization:'Bearer '+t}});
       var body=await res.json().catch(function(){return {};});
-      if(res.ok){ L.push(pairs[i][0]+' ['+id.slice(0,8)+'…]: HTTP 200, '+((body.items||[]).length)+' of '+(body.total!=null?body.total:'?')+' items'); }
-      else { L.push(pairs[i][0]+' ['+id.slice(0,8)+'…]: HTTP '+res.status+' — '+((body.error&&body.error.message)||'?')); }
+      if(res.ok){
+        var n=(body.items||[]).length;
+        var firstTrackNull = n>0 && !body.items[0].track;
+        L.push(pairs[i][0]+': HTTP 200, '+n+' of '+(body.total!=null?body.total:'?')+' items'+(firstTrackNull?' (track data BLANK)':''));
+      }
+      else { L.push(pairs[i][0]+': HTTP '+res.status+' — '+((body.error&&body.error.message)||'?')); }
     }catch(e){ L.push(pairs[i][0]+': network error'); }
   }
+  L.push('————');
+  /* 2. supporting info: exact-name matches only */
+  try{
+    var all=[], url='/me/playlists?limit=50';
+    while(url){ var d=await sp(url); (d.items||[]).forEach(function(p){all.push(p);});
+      url=d.next?d.next.replace('https://api.spotify.com/v1',''):null; }
+    L.push('Total playlists: '+all.length);
+    ['my shazam tracks','recent decents','on rotation'].forEach(function(n){
+      all.filter(function(p){return p.name&&p.name.toLowerCase().trim()===n;})
+         .forEach(function(p){ L.push('"'+p.name+'" id='+p.id); });
+    });
+  }catch(e){ L.push('List error: '+e.message); }
   alert(L.join('\n'));
 }
 
