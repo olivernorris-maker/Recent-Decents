@@ -635,35 +635,38 @@ function render(){
     '</div>';
 }
 
-/* ---------- diagnostic: tests the three playlists directly ---------- */
+/* ---------- diagnostic v2: HTTP status + ownership ---------- */
 async function debugPlaylists(){
   var L=[]; var t=await getToken();
   L.push('Logged in: '+(t?'yes':'NO'));
+  if(!t){ alert(L.join('\n')); return; }
+
+  var meId='?';
+  try{
+    var meR=await fetch('https://api.spotify.com/v1/me',{headers:{Authorization:'Bearer '+t}});
+    var me=await meR.json(); meId=me.id||('err '+meR.status);
+  }catch(e){ meId='fetch error'; }
+  L.push('Signed in as: '+meId);
   L.push('Baseline: '+(STATE.baseline?STATE.baseline.slice(0,16):'(none)'));
-  var since = STATE.baseline?Date.parse(STATE.baseline):0;
-  var links=[['Shazam',SHAZAM_PLAYLIST_LINK],['Recent Decents',RECENT_DECENTS_PLAYLIST_LINK],['On Rotation',ON_ROTATION_PLAYLIST_LINK]];
+  L.push('');
+
+  var links=[['Shazam',SHAZAM_PLAYLIST_LINK],
+             ['Recent Decents',RECENT_DECENTS_PLAYLIST_LINK],
+             ['On Rotation',ON_ROTATION_PLAYLIST_LINK]];
   for(var i=0;i<links.length;i++){
     var nm=links[i][0], id=plId(links[i][1]);
-    if(!id){ L.push(nm+': NO LINK'); continue; }
+    if(!id){ L.push(nm+': NO LINK / unparsable'); continue; }
     try{
-      var d=await sp('/playlists/'+id+'/tracks?limit=50');
-      var items=d.items||[]; var newest=''; var after=0;
-      items.forEach(function(it){ var a=it.added_at||''; if(a>newest) newest=a; if(a&&Date.parse(a)>since) after++; });
-      L.push(nm+': '+items.length+' tracks, '+after+' added after baseline, newest '+(newest.slice(0,16)||'?'));
-    }catch(e){ L.push(nm+': FETCH ERROR'); }
-  }
-  var rid=plId(ON_ROTATION_PLAYLIST_LINK);
-  if(rid && t){
-    try{
-      var info=await sp('/playlists/'+rid);
-      var w=await fetch('https://api.spotify.com/v1/playlists/'+rid,{method:'PUT',
-        headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},
-        body:JSON.stringify({name:info.name||'On Rotation'})});
-      L.push('Can write to playlists: '+(w.ok?'YES':'NO ('+w.status+')'));
-    }catch(e){ L.push('Write test error: '+e.message); }
+      var r=await fetch('https://api.spotify.com/v1/playlists/'+id+'?fields=name,owner(id),tracks(total)',
+                        {headers:{Authorization:'Bearer '+t}});
+      var d=await r.json();
+      if(!r.ok){ L.push(nm+': HTTP '+r.status+' '+((d.error&&d.error.message)||'')); continue; }
+      var owner=(d.owner&&d.owner.id)||'?';
+      var total=(d.tracks&&d.tracks.total);
+      L.push(nm+': "'+(d.name||'?')+'" — owner '+owner+(owner===meId?' (YOU)':' (NOT YOU)')+', '+total+' tracks');
+    }catch(e){ L.push(nm+': fetch error '+e.message); }
   }
   alert(L.join('\n'));
-}
 
 function goView(v){
   STATE.view=v; render();
