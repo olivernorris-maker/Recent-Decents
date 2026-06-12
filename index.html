@@ -635,26 +635,34 @@ function render(){
     '</div>';
 }
 
-/* ---------- diagnostic: shows what the app can actually see ---------- */
+/* ---------- diagnostic: tests the three playlists directly ---------- */
 async function debugPlaylists(){
-  var lines=[];
-  lines.push('Pasted links read as IDs:');
-  lines.push('  Shazam: '+(plId(SHAZAM_PLAYLIST_LINK)||'(none)'));
-  lines.push('  Recent Decents: '+(plId(RECENT_DECENTS_PLAYLIST_LINK)||'(none)'));
-  lines.push('  On Rotation: '+(plId(ON_ROTATION_PLAYLIST_LINK)||'(none)'));
-  try{
-    var t=await getToken();
-    lines.push('Logged in: '+(t?'yes':'NO'));
-    var scopeTest=await fetch('https://api.spotify.com/v1/me',{headers:{Authorization:'Bearer '+t}});
-    lines.push('Token works: '+(scopeTest.ok?'yes':'NO ('+scopeTest.status+')'));
-    /* try a write to prove playlist permission */
-    var me=await scopeTest.json(); var uid=me.id;
-    var w=await fetch('https://api.spotify.com/v1/me/playlists?limit=50',{headers:{Authorization:'Bearer '+t}});
-    var pl=await w.json();
-    lines.push('Playlists visible to app: '+((pl.items||[]).length));
-    (pl.items||[]).slice(0,40).forEach(function(p){ lines.push('  • '+p.name); });
-  }catch(e){ lines.push('Error: '+e.message); }
-  alert(lines.join('\n'));
+  var L=[]; var t=await getToken();
+  L.push('Logged in: '+(t?'yes':'NO'));
+  L.push('Baseline: '+(STATE.baseline?STATE.baseline.slice(0,16):'(none)'));
+  var since = STATE.baseline?Date.parse(STATE.baseline):0;
+  var links=[['Shazam',SHAZAM_PLAYLIST_LINK],['Recent Decents',RECENT_DECENTS_PLAYLIST_LINK],['On Rotation',ON_ROTATION_PLAYLIST_LINK]];
+  for(var i=0;i<links.length;i++){
+    var nm=links[i][0], id=plId(links[i][1]);
+    if(!id){ L.push(nm+': NO LINK'); continue; }
+    try{
+      var d=await sp('/playlists/'+id+'/tracks?limit=50');
+      var items=d.items||[]; var newest=''; var after=0;
+      items.forEach(function(it){ var a=it.added_at||''; if(a>newest) newest=a; if(a&&Date.parse(a)>since) after++; });
+      L.push(nm+': '+items.length+' tracks, '+after+' added after baseline, newest '+(newest.slice(0,16)||'?'));
+    }catch(e){ L.push(nm+': FETCH ERROR'); }
+  }
+  var rid=plId(ON_ROTATION_PLAYLIST_LINK);
+  if(rid && t){
+    try{
+      var info=await sp('/playlists/'+rid);
+      var w=await fetch('https://api.spotify.com/v1/playlists/'+rid,{method:'PUT',
+        headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},
+        body:JSON.stringify({name:info.name||'On Rotation'})});
+      L.push('Can write to playlists: '+(w.ok?'YES':'NO ('+w.status+')'));
+    }catch(e){ L.push('Write test error: '+e.message); }
+  }
+  alert(L.join('\n'));
 }
 
 function goView(v){
