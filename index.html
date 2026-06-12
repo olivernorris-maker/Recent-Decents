@@ -74,6 +74,12 @@
   .pick-dismiss{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.05em;padding:7px 13px;border-radius:100px;
     background:transparent;color:var(--ink-2);border:1px solid var(--line-2);cursor:pointer}
   .tools{display:flex;gap:8px;margin-top:12px}
+  .links{display:inline-flex;gap:6px;margin-left:auto}
+  .lnk{font-family:'Space Mono',monospace;font-size:9.5px;letter-spacing:0.04em;text-transform:uppercase;
+    text-decoration:none;padding:2px 8px;border-radius:4px;border:1px solid var(--line-2)}
+  .lnk.sp{color:#6FC4B7}
+  .lnk.bc{color:#E2A268}
+  .lnk:hover{border-color:var(--accent)}
   .tools button{flex:1;font-family:'Space Mono',monospace;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;
     padding:10px;border-radius:10px;background:transparent;border:1px solid var(--line);color:var(--ink-3);cursor:pointer}
   .tools button:hover{border-color:var(--accent);color:var(--accent-ink)}
@@ -249,17 +255,30 @@ async function pageItems(start, source, since, isLiked){
 }
 async function getLiked(since){ return pageItems('/me/tracks?limit=50','Liked',since,true); }
 async function findPlaylistId(name){
+  var target=String(name).toLowerCase().trim();
   var url='/me/playlists?limit=50';
   while(url){
     var d=await sp(url);
-    var p=(d.items||[]).find(function(x){return x.name===name;});
+    var p=(d.items||[]).find(function(x){return x.name && x.name.toLowerCase().trim()===target;});
     if(p) return p.id;
     url=d.next?d.next.replace('https://api.spotify.com/v1',''):null;
   }
   return null;
 }
-async function getPlaylist(name, source, since){
-  var id=await findPlaylistId(name); if(!id) return [];
+async function findPlaylistContains(sub){
+  var s=String(sub).toLowerCase();
+  var url='/me/playlists?limit=50';
+  while(url){
+    var d=await sp(url);
+    var p=(d.items||[]).find(function(x){return x.name && x.name.toLowerCase().indexOf(s)>-1;});
+    if(p) return p.id;
+    url=d.next?d.next.replace('https://api.spotify.com/v1',''):null;
+  }
+  return null;
+}
+async function getPlaylist(name, source, since, fuzzy){
+  var id = fuzzy ? await findPlaylistContains(name) : await findPlaylistId(name);
+  if(!id) return [];
   return pageItems('/playlists/'+id+'/tracks?limit=100', source, since, false);
 }
 function lfmKey(r){ return (r.Artist||'').split(',')[0].trim() + '~~' + (r.Track||''); }
@@ -312,6 +331,7 @@ async function spw(path, method, body){
 async function myId(){ if(STATE._me) return STATE._me; var d=await sp('/me'); STATE._me=d.id; return d.id; }
 async function ensurePlaylist(name){
   var id=await findPlaylistId(name);
+  if(!id) id=await findPlaylistContains(String(name).toLowerCase());
   if(id) return id;
   var uid=await myId();
   var d=await spw('/users/'+uid+'/playlists','POST',{name:name, public:false, description:'Managed by Recent Decents'});
@@ -416,7 +436,7 @@ async function doSync(btn){
     var existing={}; STATE.rows.forEach(function(r){ if(r.URI) existing[r.URI]=1; });
     var found=[];
     found=found.concat(await getLiked(since));
-    found=found.concat(await getPlaylist('My Shazam Tracks','Shazam', since));
+    found=found.concat(await getPlaylist('shazam','Shazam', since, true));
     found=found.concat(await getPlaylist('Recent Decents','Recent Decents', since));
     var seen={}, fresh=[];
     found.forEach(function(t){ if(t&&t.URI&&!existing[t.URI]&&!seen[t.URI]){ seen[t.URI]=1; fresh.push(t); } });
@@ -429,6 +449,13 @@ async function doSync(btn){
       render();
       toast(fresh.length+' new '+(fresh.length===1?'save':'saves'));
     } else { toast('Up to date — nothing new'); }
+    /* backfill: enrich any existing rows that never got Last.fm data */
+    var stale=STATE.rows.filter(function(r){ return r.URI && !r.Listeners && !(r.Genres&&String(r.Genres).length) && !Number(r.Plays); });
+    if(stale.length){
+      await enrichTracks(stale);
+      stale.forEach(function(r){ writeSheet({action:'updateEnrichment', uri:r.URI, genres:r.Genres||'', plays:r.Plays||0, listeners:r.Listeners||0}); });
+      render();
+    }
   }catch(e){ toast('Sync problem — check connection'); }
   finally{ if(btn){ btn.disabled=false; btn.querySelector('svg').classList.remove('spin'); } }
 }
@@ -481,23 +508,29 @@ function counts(){ var c={All:STATE.rows.length}; STATUSES.forEach(function(s){c
 
 function fmtNum(n){ n=Number(n)||0; if(n>=1e6) return (n/1e6).toFixed(1).replace(/\.0$/,'')+'M';
   if(n>=1e3) return (n/1e3).toFixed(1).replace(/\.0$/,'')+'k'; return ''+n; }
+/* recover any durations Google Sheets mangled into a time-of-day */
+function fixDur(d){ d=String(d||''); var m=d.match(/T(\d\d):(\d\d)/); if(m) return parseInt(m[1],10)+':'+m[2]; return d; }
+function bandcampUrl(r){ return 'https://bandcamp.com/search?q='+encodeURIComponent((r.Artist||'')+' '+(r.Track||'')); }
 
 function cardHTML(r){
   var sleeve = r.Art ? '<img class="sleeve" src="'+esc(r.Art)+'" alt="">'
     : '<div class="sleeve"><span class="sleeve-fallback">'+esc((r.Artist||'?').slice(0,1))+'</span></div>';
   var opts=STATUSES.map(function(s){ return '<option'+(((r.Status||'New')===s)?' selected':'')+'>'+s+'</option>'; }).join('');
   var listeners = (r.Listeners&&Number(r.Listeners)>0) ? fmtNum(r.Listeners)+' listeners' : '';
-  var meta=[r.Album, r.Year, r.Duration, listeners].filter(Boolean).join(' · ').toUpperCase();
+  var meta=[r.Album, r.Year, fixDur(r.Duration), listeners].filter(Boolean).join(' · ').toUpperCase();
   var plays=Number(r.Plays)||0;
   var playsBadge = plays>0 ? '<span class="plays">▶ '+plays+'</span>' : '';
   var genres=(r.Genres||'').split(',').map(function(g){return g.trim();}).filter(Boolean)
     .map(function(g){return '<span class="genre">'+esc(g)+'</span>';}).join('');
   var srcClass=esc((r.Source||'Manual').replace(/[^A-Za-z]/g,''));
+  var links='<span class="links">'+
+    (r.URL?'<a class="lnk sp" href="'+esc(r.URL)+'" target="_blank" rel="noopener">Spotify</a>':'')+
+    '<a class="lnk bc" href="'+esc(bandcampUrl(r))+'" target="_blank" rel="noopener">Bandcamp</a></span>';
   return '<div class="card">'+sleeve+'<div class="cbody"><div class="crow"><div style="min-width:0">'+
     '<div class="artist">'+esc(r.Artist)+'</div><div class="track">'+esc(r.Track)+'</div>'+
     '<div class="meta">'+esc(meta)+'</div></div>'+
     '<select class="status" data-s="'+esc(r.Status||'New')+'" onchange="setStatus(\''+esc(r.URI)+'\',this.value)">'+opts+'</select>'+
-    '</div><div class="tags"><span class="src '+srcClass+'">'+esc(r.Source||'Manual')+'</span>'+playsBadge+genres+'</div></div></div>';
+    '</div><div class="tags"><span class="src '+srcClass+'">'+esc(r.Source||'Manual')+'</span>'+playsBadge+genres+links+'</div></div></div>';
 }
 
 function pickCardHTML(r){
