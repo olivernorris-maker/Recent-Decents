@@ -147,12 +147,12 @@
    three dots ⋮ → Share → Copy link, and paste it between the quotes.
    These make playlist matching exact — no name guessing.
    ============================================================ */
-var CLIENT_ID      = '6ce6cf4939f0479a81f248978259cdbf';
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjuAnaMshKcnqyeCJyWgmWWv2zaARIfUEKqcFJ_AkwlXFet_kNu9LJd5iCY9nPwsHu/exec';
+var CLIENT_ID      = 'PASTE_YOUR_SPOTIFY_CLIENT_ID_HERE';
+var APPS_SCRIPT_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
 
-var SHAZAM_PLAYLIST_LINK         = 'https://open.spotify.com/playlist/56jpOfYps9xIN8djlrDqAU?si=87559684d3e7421b&pt=02726f1d181d5aee64f6f4bc47cd1394';   /* link to "My Shazam Tracks" */
-var RECENT_DECENTS_PLAYLIST_LINK = 'https://open.spotify.com/playlist/32XNkPX0wHDzOpgh7V2Xk0?si=bf9abbb47049483a';   /* link to your "Recent Decents" */
-var ON_ROTATION_PLAYLIST_LINK    = 'https://open.spotify.com/playlist/2BQk3EVHsi596qP2lVwpxr?si=ad3b38a11d8b4a75';   /* link to your "On Rotation" */
+var SHAZAM_PLAYLIST_LINK         = '';   /* link to "My Shazam Tracks" */
+var RECENT_DECENTS_PLAYLIST_LINK = '';   /* link to your "Recent Decents" */
+var ON_ROTATION_PLAYLIST_LINK    = '';   /* link to your "On Rotation" */
 /* ============================================================ */
 
 /* pull the playlist ID out of a pasted Spotify link (handles ?si=... etc.) */
@@ -635,38 +635,35 @@ function render(){
     '</div>';
 }
 
-/* ---------- diagnostic v2: HTTP status + ownership ---------- */
+/* ---------- diagnostic: tests the three playlists directly ---------- */
 async function debugPlaylists(){
   var L=[]; var t=await getToken();
   L.push('Logged in: '+(t?'yes':'NO'));
-  if(!t){ alert(L.join('\n')); return; }
-
-  var meId='?';
-  try{
-    var meR=await fetch('https://api.spotify.com/v1/me',{headers:{Authorization:'Bearer '+t}});
-    var me=await meR.json(); meId=me.id||('err '+meR.status);
-  }catch(e){ meId='fetch error'; }
-  L.push('Signed in as: '+meId);
   L.push('Baseline: '+(STATE.baseline?STATE.baseline.slice(0,16):'(none)'));
-  L.push('');
-
-  var links=[['Shazam',SHAZAM_PLAYLIST_LINK],
-             ['Recent Decents',RECENT_DECENTS_PLAYLIST_LINK],
-             ['On Rotation',ON_ROTATION_PLAYLIST_LINK]];
+  var since = STATE.baseline?Date.parse(STATE.baseline):0;
+  var links=[['Shazam',SHAZAM_PLAYLIST_LINK],['Recent Decents',RECENT_DECENTS_PLAYLIST_LINK],['On Rotation',ON_ROTATION_PLAYLIST_LINK]];
   for(var i=0;i<links.length;i++){
     var nm=links[i][0], id=plId(links[i][1]);
-    if(!id){ L.push(nm+': NO LINK / unparsable'); continue; }
+    if(!id){ L.push(nm+': NO LINK'); continue; }
     try{
-      var r=await fetch('https://api.spotify.com/v1/playlists/'+id+'?fields=name,owner(id),tracks(total)',
-                        {headers:{Authorization:'Bearer '+t}});
-      var d=await r.json();
-      if(!r.ok){ L.push(nm+': HTTP '+r.status+' '+((d.error&&d.error.message)||'')); continue; }
-      var owner=(d.owner&&d.owner.id)||'?';
-      var total=(d.tracks&&d.tracks.total);
-      L.push(nm+': "'+(d.name||'?')+'" — owner '+owner+(owner===meId?' (YOU)':' (NOT YOU)')+', '+total+' tracks');
-    }catch(e){ L.push(nm+': fetch error '+e.message); }
+      var d=await sp('/playlists/'+id+'/tracks?limit=50');
+      var items=d.items||[]; var newest=''; var after=0;
+      items.forEach(function(it){ var a=it.added_at||''; if(a>newest) newest=a; if(a&&Date.parse(a)>since) after++; });
+      L.push(nm+': '+items.length+' tracks, '+after+' added after baseline, newest '+(newest.slice(0,16)||'?'));
+    }catch(e){ L.push(nm+': FETCH ERROR'); }
+  }
+  var rid=plId(ON_ROTATION_PLAYLIST_LINK);
+  if(rid && t){
+    try{
+      var info=await sp('/playlists/'+rid);
+      var w=await fetch('https://api.spotify.com/v1/playlists/'+rid,{method:'PUT',
+        headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},
+        body:JSON.stringify({name:info.name||'On Rotation'})});
+      L.push('Can write to playlists: '+(w.ok?'YES':'NO ('+w.status+')'));
+    }catch(e){ L.push('Write test error: '+e.message); }
   }
   alert(L.join('\n'));
+}
 
 function goView(v){
   STATE.view=v; render();
