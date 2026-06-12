@@ -154,9 +154,9 @@
 var CLIENT_ID      = '6ce6cf4939f0479a81f248978259cdbf';
 var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjuAnaMshKcnqyeCJyWgmWWv2zaARIfUEKqcFJ_AkwlXFet_kNu9LJd5iCY9nPwsHu/exec';
 
-var SHAZAM_PLAYLIST_LINK         = '56jpOfYps9xIN8djIrDqAU';
-var RECENT_DECENTS_PLAYLIST_LINK = '32XNkPX0wHDzOpgh7V2Xk0';
-var ON_ROTATION_PLAYLIST_LINK    = '2BQk3EVHsi596qP2lVwpxr';
+var SHAZAM_PLAYLIST_LINK         = '56jpOfYps9xIN8djlrDqAU';   /* link to "My Shazam Tracks" */
+var RECENT_DECENTS_PLAYLIST_LINK = '32XNkPX0wHDzOpgh7V2Xk0';   /* link to your "Recent Decents" */
+var ON_ROTATION_PLAYLIST_LINK    = '2BQk3EVHsi596qP2lVwpxr';   /* link to your "On Rotation" */
 /* ============================================================ */
 
 /* accepts a full link, a spotify:playlist:ID uri, OR a plain ID */
@@ -170,7 +170,7 @@ function plId(s){
 
 var REDIRECT_URI = location.origin + location.pathname;
 var SCOPES = 'user-library-read playlist-read-private playlist-modify-private playlist-modify-public';
-var STATUSES = ['New','To listen','Love','Decent','Pass'];
+var STATUSES = ['New','To listen','Love','Decent','Pass','Delete'];
 var WATCH = [['Liked','Liked'],['My Shazam Tracks','Shazam'],['Recent Decents','Recent Decents']];
 var ON_ROTATION_NAME = 'On Rotation';
 var RECENT_DECENTS_NAME = 'Recent Decents';
@@ -264,7 +264,7 @@ async function pageItems(start, source, since, isLiked){
     var items=d.items||[];
     for(var i=0;i<items.length;i++){
       var it=items[i];
-      var tr=mapTrack(it.track, source);
+      var tr=mapTrack(it.track||it.item, source);
       if(!tr) continue;
       tr._added = it.added_at || '';
       if(since && tr._added && Date.parse(tr._added) <= since){
@@ -304,7 +304,7 @@ async function getPlaylist(name, source, since, fuzzy, link){
   var id = plId(link);
   if(!id) id = fuzzy ? await findPlaylistContains(name) : await findPlaylistId(name);
   if(!id) return [];
-  return pageItems('/playlists/'+id+'/tracks?limit=100', source, since, false);
+  return pageItems('/playlists/'+id+'/items?limit=100', source, since, false);
 }
 function lfmKey(r){ return (r.Artist||'').split(',')[0].trim() + '~~' + (r.Track||''); }
 async function enrichTracks(rows){
@@ -351,7 +351,8 @@ async function spw(path, method, body){
   var res=await fetch('https://api.spotify.com/v1'+path,{ method:method||'GET',
     headers:{Authorization:'Bearer '+t, 'Content-Type':'application/json'},
     body: body?JSON.stringify(body):undefined });
-  if(res.status===401||res.status===403) throw new Error('scope');
+  if(res.status===401) throw new Error('scope');
+  if(res.status===403){ var e403=await res.json().catch(function(){return {};}); throw new Error('forbidden:'+((e403.error&&e403.error.message)||'')); }
   var txt=await res.text(); try{ return JSON.parse(txt); }catch(e){ return {}; }
 }
 async function myId(){ if(STATE._me) return STATE._me; var d=await sp('/me'); STATE._me=d.id; return d.id; }
@@ -361,19 +362,20 @@ async function ensurePlaylist(name, link){
   if(!id) id=await findPlaylistContains(String(name).toLowerCase());
   if(id) return id;
   var uid=await myId();
-  var d=await spw('/users/'+uid+'/playlists','POST',{name:name, public:false, description:'Managed by Recent Decents'});
+  var d=await spw('/me/playlists','POST',{name:name, public:false, description:'Managed by Recent Decents'});
   return d.id;
 }
 async function playlistUris(id){
-  var out=[], url='/playlists/'+id+'/tracks?fields=items(track(uri)),next&limit=100';
-  while(url){ var d=await sp(url); (d.items||[]).forEach(function(it){ if(it.track&&it.track.uri) out.push(it.track.uri); });
+  var out=[], url='/playlists/'+id+'/items?limit=100';
+  while(url){ var d=await sp(url); (d.items||[]).forEach(function(it){
+    var tr=it.item||it.track; if(tr&&tr.uri) out.push(tr.uri); });
     url=d.next?d.next.replace('https://api.spotify.com/v1',''):null; }
   return out;
 }
-async function plAdd(id, uris){ for(var i=0;i<uris.length;i+=100){ await spw('/playlists/'+id+'/tracks','POST',{uris:uris.slice(i,i+100)}); } }
+async function plAdd(id, uris){ for(var i=0;i<uris.length;i+=100){ await spw('/playlists/'+id+'/items','POST',{uris:uris.slice(i,i+100)}); } }
 async function plRemove(id, uris){
   for(var i=0;i<uris.length;i+=100){
-    await spw('/playlists/'+id+'/tracks','DELETE',{tracks:uris.slice(i,i+100).map(function(u){return {uri:u};})});
+    await spw('/playlists/'+id+'/items','DELETE',{items:uris.slice(i,i+100).map(function(u){return {uri:u};})});
   }
 }
 
@@ -390,8 +392,10 @@ async function addToRotation(row, via){
     toast('Added to On Rotation');
   }catch(e){
     if(e.message==='scope'){
-      alert('Spotify hasn\u2019t given the app playlist permission yet.\n\nTap "Reconnect Spotify" at the bottom of the app, approve, then set the track to Love again.');
-    } else { toast('Could not reach On Rotation'); }
+      alert('Reconnect Spotify — tap Reconnect at the bottom and approve.');
+    } else if(e.message&&e.message.indexOf('forbidden')===0){
+      toast('Spotify blocked this — try reconnecting');
+    } else { toast('Could not reach On Rotation: '+e.message); }
   }
 }
 async function runExpiry(){
@@ -504,6 +508,12 @@ async function startFresh(){
 }
 
 function setStatus(uri, status){
+  if(status==='Delete'){
+    if(!confirm('Remove this entry from the sheet permanently?')){ render(); return; }
+    STATE.rows=STATE.rows.filter(function(x){return x.URI!==uri;});
+    writeSheet({action:'deleteRow', uri:uri});
+    render(); return;
+  }
   var r=STATE.rows.find(function(x){return x.URI===uri;});
   if(r) r.Status=status;
   writeSheet({action:'updateStatus', uri:uri, status:status});
@@ -515,7 +525,7 @@ async function runSearch(){
   var q=document.getElementById('q').value.trim(); if(!q) return;
   var box=document.getElementById('results'); box.innerHTML='<p class="meta" style="padding:8px 0">searching…</p>';
   try{
-    var d=await sp('/search?type=track&limit=6&q='+encodeURIComponent(q));
+    var d=await sp('/search?type=track&limit=10&q='+encodeURIComponent(q));
     var items=(d.tracks&&d.tracks.items)||[];
     if(!items.length){ box.innerHTML='<p class="meta" style="padding:8px 0">no matches</p>'; return; }
     box.innerHTML=items.map(function(t){
@@ -654,12 +664,12 @@ async function debugPlaylists(){
     var id=plId(pairs[i][1]);
     if(!id){ L.push(pairs[i][0]+': no ID pasted'); continue; }
     try{
-      var res=await fetch('https://api.spotify.com/v1/playlists/'+id+'/tracks?limit=3',
+      var res=await fetch('https://api.spotify.com/v1/playlists/'+id+'/items?limit=3',
         {headers:{Authorization:'Bearer '+t}});
       var body=await res.json().catch(function(){return {};});
       if(res.ok){
         var n=(body.items||[]).length;
-        var firstTrackNull = n>0 && !body.items[0].track;
+        var firstTrackNull = n>0 && !(body.items[0].item||body.items[0].track);
         L.push(pairs[i][0]+': HTTP 200, '+n+' of '+(body.total!=null?body.total:'?')+' items'+(firstTrackNull?' (track data BLANK)':''));
       }
       else { L.push(pairs[i][0]+': HTTP '+res.status+' — '+((body.error&&body.error.message)||'?')); }
