@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16130F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2316130F'/%3E%3Ccircle cx='32' cy='32' r='17' fill='none' stroke='%23E08A3C' stroke-width='3'/%3E%3Ccircle cx='32' cy='32' r='4' fill='%23E08A3C'/%3E%3C/svg%3E">
+<title>Recent Decents</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,600&family=Inter:wght@400;500&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#16130F; --panel:#1E1A15; --card:#241F19;
+    --line:rgba(237,230,216,0.10); --line-2:rgba(237,230,216,0.18);
+    --ink:#EDE6D8; --ink-2:#A89E90; --ink-3:#6F665B;
+    --accent:#E08A3C; --accent-ink:#F0B071; --accent-soft:rgba(224,138,60,0.16);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;
+    min-height:100vh;-webkit-font-smoothing:antialiased;padding-bottom:40px}
+  .wrap{max-width:480px;margin:0 auto}
+
+  /* faceplate */
+  .face{background:var(--panel);padding:20px 20px 15px;border-bottom:1px solid var(--line);position:relative}
+  .face::after{content:"";position:absolute;left:20px;right:20px;bottom:-1px;height:1px;
+    background:linear-gradient(90deg,var(--line-2),transparent)}
+  .face-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .wordmark{font-family:'Fraunces',serif;font-style:italic;font-weight:600;font-size:27px;letter-spacing:0.005em;line-height:1}
+  .sub{font-family:'Space Mono',monospace;font-size:10px;color:var(--ink-2);letter-spacing:0.12em;text-transform:uppercase;margin-top:6px}
+  .sync-btn{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;
+    color:var(--accent-ink);background:var(--accent-soft);border:1px solid var(--accent);border-radius:100px;
+    padding:7px 14px;cursor:pointer;display:flex;align-items:center;gap:7px;white-space:nowrap}
+  .sync-btn:disabled{opacity:0.5}
+  .sync-btn svg{width:13px;height:13px}
+  .spin{animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* tabs */
+  .tabs{display:flex;gap:0;padding:12px 20px 0;overflow-x:auto;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{flex:0 0 auto;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;
+    color:var(--ink-2);padding:9px 13px 11px;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;
+    display:flex;align-items:center;gap:6px;background:none;border-top:none;border-left:none;border-right:none}
+  .tab .ct{font-size:10px;color:var(--ink-3)}
+  .tab.on{color:var(--ink);border-bottom-color:var(--accent)}
+  .tab.on .ct{color:var(--accent-ink)}
+
+  .list{padding:12px 14px 4px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:9px;display:flex;gap:12px}
+  .sleeve{width:56px;height:56px;border-radius:5px;flex:0 0 auto;object-fit:cover;background:#33291f;
+    display:flex;align-items:center;justify-content:center;border:1px solid rgba(0,0,0,0.35)}
+  .sleeve-fallback{font-family:'Fraunces',serif;font-weight:600;font-size:22px;color:rgba(255,255,255,0.8)}
+  .cbody{flex:1;min-width:0}
+  .crow{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .artist{font-family:'Fraunces',serif;font-weight:600;font-size:16px;line-height:1.2;color:var(--ink)}
+  .track{font-size:12.5px;color:var(--ink-2);line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .meta{font-family:'Space Mono',monospace;font-size:9.5px;color:var(--ink-3);letter-spacing:0.03em;margin-top:3px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tags{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:9px}
+  .src{font-family:'Space Mono',monospace;font-size:9.5px;letter-spacing:0.05em;text-transform:uppercase;padding:2px 7px;border-radius:4px}
+  .src.Shazam{background:rgba(224,138,60,0.14);color:#E2A268}
+  .src.Liked{background:rgba(63,168,154,0.14);color:#6FC4B7}
+  .src[class*="Recent"]{background:rgba(150,140,200,0.14);color:#A99FD4}
+  .src.Manual{background:rgba(237,230,216,0.08);color:var(--ink-2)}
+  .genre{font-size:10px;color:var(--ink-3);padding:2px 7px;border:1px solid var(--line);border-radius:4px;white-space:nowrap}
+
+  select.status{flex:0 0 auto;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.05em;text-transform:uppercase;
+    padding:5px 8px;border-radius:100px;border:1px solid var(--line-2);color:var(--ink-2);background:var(--panel);cursor:pointer;
+    -webkit-appearance:none;appearance:none;text-align:center}
+  select.status[data-s="New"]{border-style:dashed}
+  select.status[data-s="To listen"],select.status[data-s="Love"]{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft)}
+
+  /* manual add */
+  .dock{padding:10px 14px 20px}
+  .add-toggle{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;background:transparent;
+    border:1px dashed var(--line-2);border-radius:12px;padding:13px;color:var(--ink-2);
+    font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer}
+  .add-toggle:hover{border-color:var(--accent);color:var(--accent-ink)}
+  .add-panel{display:none;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px;margin-top:9px}
+  .add-panel.open{display:block}
+  .search-row{display:flex;gap:8px}
+  .search-row input{flex:1;background:var(--panel);border:1px solid var(--line-2);border-radius:8px;color:var(--ink);
+    font-family:'Inter',sans-serif;font-size:14px;padding:9px 12px}
+  .search-row input:focus{outline:none;border-color:var(--accent)}
+  .search-row button{background:var(--accent-soft);border:1px solid var(--accent);color:var(--accent-ink);border-radius:8px;
+    font-family:'Space Mono',monospace;font-size:12px;padding:0 16px;cursor:pointer}
+  .results{margin-top:10px}
+  .result{display:flex;gap:11px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+  .result img{width:40px;height:40px;border-radius:4px;flex:0 0 auto;background:#33291f}
+  .result .ri{flex:1;min-width:0}
+  .result .ra{font-family:'Fraunces',serif;font-weight:600;font-size:14px}
+  .result .rt{font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .result button{flex:0 0 auto;background:transparent;border:1px solid var(--line-2);color:var(--ink);border-radius:100px;
+    font-family:'Space Mono',monospace;font-size:11px;padding:6px 13px;cursor:pointer}
+
+  /* connect screen */
+  .connect{padding:60px 28px;text-align:center;max-width:440px;margin:0 auto}
+  .connect .wordmark{font-size:38px;margin-bottom:6px}
+  .connect p{color:var(--ink-2);font-size:14px;line-height:1.7;margin:14px 0 28px}
+  .connect button{background:var(--accent);color:#16130F;border:none;border-radius:100px;font-family:'Space Mono',monospace;
+    font-size:13px;letter-spacing:0.06em;padding:14px 28px;cursor:pointer;font-weight:700}
+  .redirect-box{margin-top:34px;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .redirect-box .lbl{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:7px}
+  .redirect-box code{display:block;font-family:'Space Mono',monospace;font-size:12px;color:var(--accent-ink);word-break:break-all;line-height:1.5}
+
+  .empty{text-align:center;color:var(--ink-3);font-family:'Space Mono',monospace;font-size:12px;letter-spacing:0.06em;padding:50px 20px;line-height:1.8}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);
+    color:var(--ink);font-size:13px;padding:11px 18px;border-radius:100px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:50}
+  .toast.show{opacity:1}
+  .hidden{display:none !important}
+</style>
+</head>
+<body>
+
+<div id="app" class="wrap"></div>
+<div id="toast" class="toast"></div>
+
+<script>
+/* ============================================================
+   STEP 5 — PASTE YOUR TWO VALUES BETWEEN THE QUOTES BELOW.
+   (The guide tells you where each one comes from.)
+   ============================================================ */
+var CLIENT_ID      = 'PASTE_YOUR_SPOTIFY_CLIENT_ID_HERE';
+var APPS_SCRIPT_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+/* ============================================================ */
+
+var REDIRECT_URI = location.origin + location.pathname;
+var SCOPES = 'user-library-read playlist-read-private';
+var STATUSES = ['New','To listen','Love','Decent','Pass'];
+var WATCH = [['Liked','Liked'],['My Shazam Tracks','Shazam'],['Recent Decents','Recent Decents']];
+
+var STATE = { rows: [], baseline: '', view: 'New', addOpen: false };
+
+/* ---------- tiny helpers ---------- */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function msToTime(ms){ if(!ms) return ''; var s=Math.round(ms/1000); return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2); }
+function toast(msg){ var t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},2200); }
+
+/* ---------- Spotify login (PKCE — no password stored, no secret) ---------- */
+function randomString(len){ var a=new Uint8Array(len); crypto.getRandomValues(a);
+  return Array.from(a,function(b){return ('0'+b.toString(16)).slice(-2);}).join(''); }
+async function sha256b64(str){ var d=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  var b=''; new Uint8Array(d).forEach(function(x){b+=String.fromCharCode(x);});
+  return btoa(b).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+
+async function login(){
+  var verifier=randomString(64);
+  localStorage.setItem('rd_verifier', verifier);
+  var challenge=await sha256b64(verifier);
+  var p=new URLSearchParams({client_id:CLIENT_ID, response_type:'code', redirect_uri:REDIRECT_URI,
+    code_challenge_method:'S256', code_challenge:challenge, scope:SCOPES});
+  location.href='https://accounts.spotify.com/authorize?'+p.toString();
+}
+
+async function handleRedirect(){
+  var q=new URLSearchParams(location.search);
+  if(q.get('error')){ toast('Spotify sign-in was cancelled'); history.replaceState({},'',REDIRECT_URI); return; }
+  var code=q.get('code'); if(!code) return;
+  var verifier=localStorage.getItem('rd_verifier');
+  var body=new URLSearchParams({client_id:CLIENT_ID, grant_type:'authorization_code',
+    code:code, redirect_uri:REDIRECT_URI, code_verifier:verifier});
+  var res=await fetch('https://accounts.spotify.com/api/token',{method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:body});
+  var d=await res.json();
+  if(d.refresh_token){
+    localStorage.setItem('rd_refresh', d.refresh_token);
+    localStorage.setItem('rd_access', d.access_token);
+    localStorage.setItem('rd_exp', Date.now()+d.expires_in*1000);
+  }
+  history.replaceState({},'',REDIRECT_URI);
+}
+
+async function getToken(){
+  var exp=+localStorage.getItem('rd_exp')||0;
+  if(Date.now() < exp-60000) return localStorage.getItem('rd_access');
+  var refresh=localStorage.getItem('rd_refresh'); if(!refresh) return null;
+  var body=new URLSearchParams({client_id:CLIENT_ID, grant_type:'refresh_token', refresh_token:refresh});
+  var res=await fetch('https://accounts.spotify.com/api/token',{method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:body});
+  var d=await res.json();
+  if(d.access_token){
+    localStorage.setItem('rd_access', d.access_token);
+    localStorage.setItem('rd_exp', Date.now()+d.expires_in*1000);
+    if(d.refresh_token) localStorage.setItem('rd_refresh', d.refresh_token);
+    return d.access_token;
+  }
+  return null;
+}
+function loggedIn(){ return !!localStorage.getItem('rd_refresh'); }
+function logout(){ ['rd_refresh','rd_access','rd_exp'].forEach(function(k){localStorage.removeItem(k);}); render(); }
+
+/* ---------- Spotify reads ---------- */
+async function sp(path){
+  var t=await getToken(); if(!t) throw new Error('no token');
+  var res=await fetch('https://api.spotify.com/v1'+path,{headers:{Authorization:'Bearer '+t}});
+  return res.json();
+}
+function mapTrack(t, source){
+  if(!t) return null;
+  var art = (t.album && t.album.images && t.album.images.length) ? t.album.images[t.album.images.length-1].url : '';
+  return {
+    Source:source,
+    Artist:(t.artists||[]).map(function(a){return a.name;}).join(', '),
+    ArtistIds:(t.artists||[]).map(function(a){return a.id;}).join(','),
+    Track:t.name||'', Album:(t.album&&t.album.name)||'',
+    Year:(t.album&&t.album.release_date)?t.album.release_date.slice(0,4):'',
+    Duration:msToTime(t.duration_ms), Popularity:(t.popularity!=null?t.popularity:''),
+    Genres:'', URI:t.uri||'', URL:(t.external_urls&&t.external_urls.spotify)||'', Art:art
+  };
+}
+async function pageItems(start, source, since, isLiked){
+  var out=[], url=start;
+  while(url){
+    var d=await sp(url);
+    var items=d.items||[];
+    for(var i=0;i<items.length;i++){
+      var it=items[i];
+      var tr=mapTrack(it.track, source);
+      if(!tr) continue;
+      tr._added = it.added_at || '';
+      if(since && tr._added && Date.parse(tr._added) <= since){
+        if(isLiked) return out;   /* likes come newest-first: everything after is older, stop */
+        else continue;            /* playlists aren't date-ordered: skip this one, keep scanning */
+      }
+      out.push(tr);
+    }
+    url = d.next ? d.next.replace('https://api.spotify.com/v1','') : null;
+  }
+  return out;
+}
+async function getLiked(since){ return pageItems('/me/tracks?limit=50','Liked',since,true); }
+async function findPlaylistId(name){
+  var url='/me/playlists?limit=50';
+  while(url){
+    var d=await sp(url);
+    var p=(d.items||[]).find(function(x){return x.name===name;});
+    if(p) return p.id;
+    url=d.next?d.next.replace('https://api.spotify.com/v1',''):null;
+  }
+  return null;
+}
+async function getPlaylist(name, source, since){
+  var id=await findPlaylistId(name); if(!id) return [];
+  return pageItems('/playlists/'+id+'/tracks?limit=100', source, since, false);
+}
+async function enrichGenres(rows){
+  try{
+    var ids={};
+    rows.forEach(function(r){ (r.ArtistIds||'').split(',').forEach(function(i){ if(i) ids[i]=1; }); });
+    var list=Object.keys(ids); var map={};
+    for(var i=0;i<list.length;i+=50){
+      var d=await sp('/artists?ids='+list.slice(i,i+50).join(','));
+      (d.artists||[]).forEach(function(a){ if(a) map[a.id]=(a.genres||[]).slice(0,2); });
+    }
+    rows.forEach(function(r){
+      var g=[]; (r.ArtistIds||'').split(',').forEach(function(i){ if(map[i]) g=g.concat(map[i]); });
+      r.Genres=Array.from(new Set(g)).slice(0,2).join(', ');
+    });
+  }catch(e){ /* genres are optional — ignore failures */ }
+}
+
+/* ---------- Sheet read (JSONP) + write (POST) ---------- */
+function readSheet(){
+  return new Promise(function(resolve,reject){
+    var cb='rd_cb_'+Date.now();
+    var s=document.createElement('script');
+    window[cb]=function(data){ resolve(data||{}); delete window[cb]; s.remove(); };
+    s.onerror=function(){ reject(new Error('sheet read failed')); s.remove(); };
+    s.src=APPS_SCRIPT_URL+'?callback='+cb+'&t='+Date.now();
+    document.body.appendChild(s);
+  });
+}
+function writeSheet(payload){
+  return fetch(APPS_SCRIPT_URL,{method:'POST', mode:'no-cors',
+    headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(payload)});
+}
+
+/* ---------- actions ---------- */
+async function doSync(btn){
+  if(btn){ btn.disabled=true; btn.querySelector('svg').classList.add('spin'); }
+  try{
+    var since = STATE.baseline ? Date.parse(STATE.baseline) : 0;
+    var existing={}; STATE.rows.forEach(function(r){ if(r.URI) existing[r.URI]=1; });
+    var found=[];
+    found=found.concat(await getLiked(since));
+    found=found.concat(await getPlaylist('My Shazam Tracks','Shazam', since));
+    found=found.concat(await getPlaylist('Recent Decents','Recent Decents', since));
+    var seen={}, fresh=[];
+    found.forEach(function(t){ if(t&&t.URI&&!existing[t.URI]&&!seen[t.URI]){ seen[t.URI]=1; fresh.push(t); } });
+    if(fresh.length){
+      await enrichGenres(fresh);
+      var today=new Date().toISOString().slice(0,10);
+      fresh.forEach(function(t){ t.Status='New'; t.Date=today; });
+      await writeSheet({action:'add', rows:fresh});
+      STATE.rows=fresh.concat(STATE.rows);
+      render();
+      toast(fresh.length+' new '+(fresh.length===1?'save':'saves'));
+    } else { toast('Up to date — nothing new'); }
+  }catch(e){ toast('Sync problem — check connection'); }
+  finally{ if(btn){ btn.disabled=false; btn.querySelector('svg').classList.remove('spin'); } }
+}
+
+async function startFresh(){
+  var now=new Date().toISOString();
+  STATE.baseline=now;
+  await writeSheet({action:'setBaseline', baseline:now});
+  render();
+}
+
+function setStatus(uri, status){
+  var r=STATE.rows.find(function(x){return x.URI===uri;});
+  if(r) r.Status=status;
+  writeSheet({action:'updateStatus', uri:uri, status:status});
+  render();
+}
+
+async function runSearch(){
+  var q=document.getElementById('q').value.trim(); if(!q) return;
+  var box=document.getElementById('results'); box.innerHTML='<p class="meta" style="padding:8px 0">searching…</p>';
+  try{
+    var d=await sp('/search?type=track&limit=6&q='+encodeURIComponent(q));
+    var items=(d.tracks&&d.tracks.items)||[];
+    if(!items.length){ box.innerHTML='<p class="meta" style="padding:8px 0">no matches</p>'; return; }
+    box.innerHTML=items.map(function(t){
+      var m=mapTrack(t,'Manual'); STATE._cache=STATE._cache||{}; STATE._cache[m.URI]=m;
+      return '<div class="result"><img src="'+esc(m.Art)+'" alt=""><div class="ri">'+
+        '<div class="ra">'+esc(m.Artist)+'</div><div class="rt">'+esc(m.Track)+' · '+esc(m.Album)+' · '+esc(m.Year)+'</div></div>'+
+        '<button onclick="addManual(\''+esc(m.URI)+'\')">add</button></div>';
+    }).join('');
+  }catch(e){ box.innerHTML='<p class="meta" style="padding:8px 0">search problem</p>'; }
+}
+async function addManual(uri){
+  var m=STATE._cache&&STATE._cache[uri]; if(!m) return;
+  if(STATE.rows.some(function(r){return r.URI===uri;})){ toast('Already saved'); return; }
+  await enrichGenres([m]);
+  m.Status='New'; m.Date=new Date().toISOString().slice(0,10);
+  await writeSheet({action:'add', rows:[m]});
+  STATE.rows=[m].concat(STATE.rows);
+  toast('Added · '+m.Artist);
+  document.getElementById('q').value=''; document.getElementById('results').innerHTML='';
+  render();
+}
+
+/* ---------- render ---------- */
+function counts(){ var c={All:STATE.rows.length}; STATUSES.forEach(function(s){c[s]=0;});
+  STATE.rows.forEach(function(r){ var s=r.Status||'New'; if(c[s]!=null) c[s]++; }); return c; }
+
+function cardHTML(r){
+  var sleeve = r.Art ? '<img class="sleeve" src="'+esc(r.Art)+'" alt="">'
+    : '<div class="sleeve"><span class="sleeve-fallback">'+esc((r.Artist||'?').slice(0,1))+'</span></div>';
+  var opts=STATUSES.map(function(s){ return '<option'+(((r.Status||'New')===s)?' selected':'')+'>'+s+'</option>'; }).join('');
+  var meta=[r.Album, r.Year, r.Duration, (r.Popularity!==''&&r.Popularity!=null?'POP '+r.Popularity:'')]
+    .filter(Boolean).join(' · ').toUpperCase();
+  var genres=(r.Genres||'').split(',').map(function(g){return g.trim();}).filter(Boolean)
+    .map(function(g){return '<span class="genre">'+esc(g)+'</span>';}).join('');
+  var srcClass=esc((r.Source||'Manual').replace(/[^A-Za-z]/g,''));
+  return '<div class="card">'+sleeve+'<div class="cbody"><div class="crow"><div style="min-width:0">'+
+    '<div class="artist">'+esc(r.Artist)+'</div><div class="track">'+esc(r.Track)+'</div>'+
+    '<div class="meta">'+esc(meta)+'</div></div>'+
+    '<select class="status" data-s="'+esc(r.Status||'New')+'" onchange="setStatus(\''+esc(r.URI)+'\',this.value)">'+opts+'</select>'+
+    '</div><div class="tags"><span class="src '+srcClass+'">'+esc(r.Source||'Manual')+'</span>'+genres+'</div></div></div>';
+}
+
+function render(){
+  var app=document.getElementById('app');
+
+  if(!loggedIn()){
+    app.innerHTML='<div class="connect"><div class="wordmark">Recent Decents</div>'+
+      '<p>Your discovery inbox. Sign in once with Spotify to pull in everything you Shazam, like, or drop into your Recent Decents playlist — then triage at your own pace.</p>'+
+      '<button onclick="login()">Connect Spotify</button>'+
+      '<div class="redirect-box"><div class="lbl">Redirect URL to add in Spotify (copy exactly)</div><code>'+esc(REDIRECT_URI)+'</code></div>'+
+      '</div>';
+    return;
+  }
+
+  if(loggedIn() && !STATE.baseline){
+    app.innerHTML='<div class="connect"><div class="wordmark">Start from now</div>'+
+      '<p>Recent Decents will only pull in music you save <b>from this point on</b> — your existing likes, Shazams and playlist history stay untouched in Spotify, so your inbox starts clean.</p>'+
+      '<p style="font-size:13px;color:var(--ink-3);margin-top:-14px">Anything older you want, you can always add by hand.</p>'+
+      '<button onclick="startFresh()">Start from now</button></div>';
+    return;
+  }
+
+  var c=counts();
+  var tabs=['New','To listen','Love','Decent','Pass','All'].map(function(v){
+    var label=(v==='New')?'Inbox':v;
+    return '<button class="tab'+(STATE.view===v?' on':'')+'" onclick="STATE.view=\''+v+'\';render()">'+label+
+      ' <span class="ct">'+(c[v]||0)+'</span></button>';
+  }).join('');
+
+  var rows=STATE.rows.filter(function(r){ return STATE.view==='All' ? true : (r.Status||'New')===STATE.view; });
+  var listHTML = rows.length ? rows.map(cardHTML).join('')
+    : '<div class="empty">nothing here yet'+(STATE.view==='New'?'<br>tap sync to pull from spotify':'')+'</div>';
+
+  app.innerHTML=
+    '<div class="face"><div class="face-top"><div><div class="wordmark">Recent Decents</div>'+
+      '<div class="sub">discovery inbox</div></div>'+
+      '<button class="sync-btn" onclick="doSync(this)"><svg viewBox="0 0 16 16" fill="none">'+
+        '<path d="M14 8a6 6 0 1 1-1.8-4.3M14 2v3.5h-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Sync</button>'+
+    '</div></div>'+
+    '<div class="tabs">'+tabs+'</div>'+
+    '<div class="list">'+listHTML+'</div>'+
+    '<div class="dock"><button class="add-toggle" onclick="STATE.addOpen=!STATE.addOpen;render()">+ Add a track</button>'+
+      '<div class="add-panel'+(STATE.addOpen?' open':'')+'">'+
+        '<div class="search-row"><input id="q" placeholder="Artist or track…" onkeydown="if(event.key===\'Enter\')runSearch()"><button onclick="runSearch()">Search</button></div>'+
+        '<div class="results" id="results"></div></div></div>';
+}
+
+/* ---------- start ---------- */
+(async function(){
+  await handleRedirect();
+  if(loggedIn()){
+    try{ var d=await readSheet(); STATE.rows=(d&&d.rows)||[]; STATE.baseline=(d&&d.baseline)||''; }catch(e){ /* show empty, sync will populate */ }
+  }
+  render();
+})();
+</script>
+</body>
+</html>
