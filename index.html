@@ -141,22 +141,32 @@
 /* ============================================================
    PASTE YOUR VALUES BETWEEN THE QUOTES BELOW.
 
-   The first two you already have.
+   CLIENT_ID and APPS_SCRIPT_URL — you already have these.
 
-   The three PLAYLIST LINKS: in Spotify, open the playlist, tap the
-   three dots ⋮ → Share → Copy link, and paste it between the quotes.
-   These make playlist matching exact — no name guessing.
+   The three PLAYLIST IDs — for each playlist:
+     1. Open open.spotify.com in a browser (not the app)
+     2. Open the playlist
+     3. The address bar shows  .../playlist/XXXXXXXXXXXX?si=...
+     4. Copy ONLY the XXXXXXXXXXXX part (between /playlist/ and the ?)
+     5. Paste it between the quotes below.
+   (A full link also works — but the plain ID is safest.)
    ============================================================ */
-var CLIENT_ID      = 'PASTE_YOUR_SPOTIFY_CLIENT_ID_HERE';
-var APPS_SCRIPT_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+var CLIENT_ID      = '6ce6cf4939f0479a81f248978259cdbf';
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjuAnaMshKcnqyeCJyWgmWWv2zaARIfUEKqcFJ_AkwlXFet_kNu9LJd5iCY9nPwsHu/exec';
 
-var SHAZAM_PLAYLIST_LINK         = '';   /* link to "My Shazam Tracks" */
-var RECENT_DECENTS_PLAYLIST_LINK = '';   /* link to your "Recent Decents" */
-var ON_ROTATION_PLAYLIST_LINK    = '';   /* link to your "On Rotation" */
+var SHAZAM_PLAYLIST_LINK         = '56jpOfYps9xIN8djlrDqAU?si=1a9de92fadfd4d3d&pt=a47d4fb2424980a769592ba6ce94cfae';
+var RECENT_DECENTS_PLAYLIST_LINK = '32XNkPX0wHDzOpgh7V2Xk0?si=40cc9f2f6a714a83';
+var ON_ROTATION_PLAYLIST_LINK    = '2BQk3EVHsi596qP2lVwpxr?si=9b5835738f26463d';
 /* ============================================================ */
 
-/* pull the playlist ID out of a pasted Spotify link (handles ?si=... etc.) */
-function plId(link){ var m=String(link||'').match(/playlist[\/:]([A-Za-z0-9]+)/); return m?m[1]:''; }
+/* accepts a full link, a spotify:playlist:ID uri, OR a plain ID */
+function plId(s){
+  s=String(s||'').trim();
+  var m=s.match(/playlist[\/:]([A-Za-z0-9]+)/);
+  if(m) return m[1];
+  m=s.match(/^([A-Za-z0-9]{18,})/);   /* a bare ID pasted on its own */
+  return m?m[1]:'';
+}
 
 var REDIRECT_URI = location.origin + location.pathname;
 var SCOPES = 'user-library-read playlist-read-private playlist-modify-private playlist-modify-public';
