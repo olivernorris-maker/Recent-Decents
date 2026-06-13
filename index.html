@@ -239,9 +239,17 @@ function loggedIn(){ return !!localStorage.getItem('rd_refresh'); }
 function logout(){ ['rd_refresh','rd_access','rd_exp'].forEach(function(k){localStorage.removeItem(k);}); render(); }
 
 /* ---------- Spotify reads ---------- */
-async function sp(path){
+function wait_(ms){ return new Promise(function(r){setTimeout(r,ms);}); }
+async function sp(path, _retry){
   var t=await getToken(); if(!t) throw new Error('no token');
   var res=await fetch('https://api.spotify.com/v1'+path,{headers:{Authorization:'Bearer '+t}});
+  if(res.status===429){
+    if(_retry) throw new Error('rate limited');
+    var after=parseInt(res.headers.get('Retry-After')||'2',10);
+    await wait_((after+1)*1000);
+    return sp(path, true);
+  }
+  if(!res.ok){ var e=await res.json().catch(function(){return {};}); throw new Error('HTTP '+res.status+': '+((e.error&&e.error.message)||'')); }
   return res.json();
 }
 function mapTrack(t, source){
@@ -346,11 +354,17 @@ function writeSheet(payload){
 }
 
 /* ---------- Spotify writes (need the modify permission — Reconnect once) ---------- */
-async function spw(path, method, body){
+async function spw(path, method, body, _retry){
   var t=await getToken(); if(!t) throw new Error('no token');
   var res=await fetch('https://api.spotify.com/v1'+path,{ method:method||'GET',
     headers:{Authorization:'Bearer '+t, 'Content-Type':'application/json'},
     body: body?JSON.stringify(body):undefined });
+  if(res.status===429){
+    if(_retry) throw new Error('rate limited');
+    var after=parseInt(res.headers.get('Retry-After')||'2',10);
+    await wait_((after+1)*1000);
+    return spw(path, method, body, true);
+  }
   if(res.status===401) throw new Error('scope');
   if(res.status===403){ var e403=await res.json().catch(function(){return {};}); throw new Error('forbidden:'+((e403.error&&e403.error.message)||'')); }
   var txt=await res.text(); try{ return JSON.parse(txt); }catch(e){ return {}; }
@@ -471,12 +485,14 @@ async function doSync(btn){
     var existing={}; STATE.rows.forEach(function(r){ if(r.URI) existing[r.URI]=1; });
     var found=[];
     found=found.concat(await getLiked(since));
+    await wait_(300);
     var shaz=await getPlaylist('shazam','Shazam', since, true, SHAZAM_PLAYLIST_LINK);
     if(!shaz.length && !plId(SHAZAM_PLAYLIST_LINK)){
       var shazId=await findPlaylistContains('shazam');
-      if(!shazId) toast('Shazam playlist not found — paste its link in settings');
+      if(!shazId) toast('Shazam playlist not found — paste its ID in settings');
     }
     found=found.concat(shaz);
+    await wait_(300);
     found=found.concat(await getPlaylist('Recent Decents','Recent Decents', since, false, RECENT_DECENTS_PLAYLIST_LINK));
     var seen={}, fresh=[];
     found.forEach(function(t){ if(t&&t.URI&&!existing[t.URI]&&!seen[t.URI]){ seen[t.URI]=1; fresh.push(t); } });
@@ -661,6 +677,7 @@ async function debugPlaylists(){
   /* 1. THE VERDICT: raw status for each pasted ID */
   var pairs=[['Shazam',SHAZAM_PLAYLIST_LINK],['RD',RECENT_DECENTS_PLAYLIST_LINK],['OnRot',ON_ROTATION_PLAYLIST_LINK]];
   for(var i=0;i<pairs.length;i++){
+    if(i>0) await wait_(400);
     var id=plId(pairs[i][1]);
     if(!id){ L.push(pairs[i][0]+': no ID pasted'); continue; }
     try{
