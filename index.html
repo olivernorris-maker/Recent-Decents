@@ -63,8 +63,9 @@
   .tags{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:9px}
   .src{font-family:'Space Mono',monospace;font-size:9.5px;letter-spacing:0.05em;text-transform:uppercase;padding:2px 7px;border-radius:4px}
   .src.Shazam{background:rgba(224,138,60,0.14);color:#E2A268}
-  .src.Liked{background:rgba(63,168,154,0.14);color:#6FC4B7}
-  .src[class*="Recent"]{background:rgba(150,140,200,0.14);color:#A99FD4}
+  .src.Loved{background:rgba(63,168,154,0.14);color:#6FC4B7}
+  .src.Found{background:rgba(150,140,200,0.14);color:#A99FD4}
+  .src.Heavy{background:rgba(224,138,60,0.14);color:#E2A268}
   .src.Manual{background:rgba(237,230,216,0.08);color:var(--ink-2)}
   .genre{font-size:10px;color:var(--ink-3);padding:2px 7px;border:1px solid var(--line);border-radius:4px;white-space:nowrap}
   .plays{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.04em;padding:2px 7px;border-radius:4px;
@@ -76,11 +77,13 @@
   .pick-dismiss{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.05em;padding:7px 13px;border-radius:100px;
     background:transparent;color:var(--ink-2);border:1px solid var(--line-2);cursor:pointer}
   .tools{display:flex;gap:8px;margin-top:12px}
-  .links{display:inline-flex;gap:6px;margin-left:auto}
+  .links{display:inline-flex;gap:6px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
   .lnk{font-family:'Space Mono',monospace;font-size:9.5px;letter-spacing:0.04em;text-transform:uppercase;
     text-decoration:none;padding:2px 8px;border-radius:4px;border:1px solid var(--line-2)}
-  .lnk.sp{color:#6FC4B7}
   .lnk.bc{color:#E2A268}
+  .lnk.qo{color:#A99FD4}
+  .lnk.yt{color:#D98A8A}
+  .lnk.lf{color:#6FC4B7}
   .lnk:hover{border-color:var(--accent)}
   .tools button{flex:1;font-family:'Space Mono',monospace;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;
     padding:10px;border-radius:10px;background:transparent;border:1px solid var(--line);color:var(--ink-3);cursor:pointer}
@@ -115,19 +118,17 @@
   .result button{flex:0 0 auto;background:transparent;border:1px solid var(--line-2);color:var(--ink);border-radius:100px;
     font-family:'Space Mono',monospace;font-size:11px;padding:6px 13px;cursor:pointer}
 
-  /* connect screen */
+  /* intro / start screen */
   .connect{padding:60px 28px;text-align:center;max-width:440px;margin:0 auto}
   .connect .wordmark{font-size:38px;margin-bottom:6px}
   .connect p{color:var(--ink-2);font-size:14px;line-height:1.7;margin:14px 0 28px}
   .connect button{background:var(--accent);color:#16130F;border:none;border-radius:100px;font-family:'Space Mono',monospace;
     font-size:13px;letter-spacing:0.06em;padding:14px 28px;cursor:pointer;font-weight:700}
-  .redirect-box{margin-top:34px;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
-  .redirect-box .lbl{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:7px}
-  .redirect-box code{display:block;font-family:'Space Mono',monospace;font-size:12px;color:var(--accent-ink);word-break:break-all;line-height:1.5}
 
   .empty{text-align:center;color:var(--ink-3);font-family:'Space Mono',monospace;font-size:12px;letter-spacing:0.06em;padding:50px 20px;line-height:1.8}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);
-    color:var(--ink);font-size:13px;padding:11px 18px;border-radius:100px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:50}
+    color:var(--ink);font-size:13px;padding:11px 18px;border-radius:100px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:50;
+    max-width:90%;text-align:center}
   .toast.show{opacity:1}
   .hidden{display:none !important}
 </style>
@@ -139,212 +140,54 @@
 
 <script>
 /* ============================================================
-   PASTE YOUR VALUES BETWEEN THE QUOTES BELOW.
-
-   CLIENT_ID and APPS_SCRIPT_URL — you already have these.
-
-   The three PLAYLIST IDs — for each playlist:
-     1. Open open.spotify.com in a browser (not the app)
-     2. Open the playlist
-     3. The address bar shows  .../playlist/XXXXXXXXXXXX?si=...
-     4. Copy ONLY the XXXXXXXXXXXX part (between /playlist/ and the ?)
-     5. Paste it between the quotes below.
-   (A full link also works — but the plain ID is safest.)
+   ONE value to paste — your Apps Script web app URL (the /exec link).
+   Nothing else. The Last.fm key lives in Code.gs on the server.
    ============================================================ */
-var CLIENT_ID      = '6ce6cf4939f0479a81f248978259cdbf';
 var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjuAnaMshKcnqyeCJyWgmWWv2zaARIfUEKqcFJ_AkwlXFet_kNu9LJd5iCY9nPwsHu/exec';
-
-var SHAZAM_PLAYLIST_LINK         = '56jpOfYps9xIN8djlrDqAU';   /* link to "My Shazam Tracks" */
-var RECENT_DECENTS_PLAYLIST_LINK = '32XNkPX0wHDzOpgh7V2Xk0';   /* link to your "Recent Decents" */
-var ON_ROTATION_PLAYLIST_LINK    = '2BQk3EVHsi596qP2lVwpxr';   /* link to your "On Rotation" */
 /* ============================================================ */
 
-/* accepts a full link, a spotify:playlist:ID uri, OR a plain ID */
-function plId(s){
-  s=String(s||'').trim();
-  var m=s.match(/playlist[\/:]([A-Za-z0-9]+)/);
-  if(m) return m[1];
-  m=s.match(/^([A-Za-z0-9]{18,})/);   /* a bare ID pasted on its own */
-  return m?m[1]:'';
-}
-
-var REDIRECT_URI = location.origin + location.pathname;
-var SCOPES = 'user-library-read playlist-read-private playlist-modify-private playlist-modify-public';
 var STATUSES = ['New','To listen','Love','Decent','Pass','Delete'];
-var WATCH = [['Liked','Liked'],['My Shazam Tracks','Shazam'],['Recent Decents','Recent Decents']];
-var ON_ROTATION_NAME = 'On Rotation';
-var RECENT_DECENTS_NAME = 'Recent Decents';
 var ROTATION_DAYS = 30;
 
-var STATE = { rows: [], baseline: '', rotation: [], dismissed: [], picks: [], picksLoaded: false, view: 'New', addOpen: false };
+var STATE = { rows: [], baseline: '', rotation: [], dismissed: [],
+              picks: [], picksLoaded: false, newtome: [], newtomeLoaded: false,
+              view: 'New', addOpen: false, _cache: {} };
 
 /* ---------- tiny helpers ---------- */
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 function msToTime(ms){ if(!ms) return ''; var s=Math.round(ms/1000); return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2); }
 function toast(msg){ var t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
-  clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},2200); }
+  clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},2600); }
+function fmtNum(n){ n=Number(n)||0; if(n>=1e6) return (n/1e6).toFixed(1).replace(/\.0$/,'')+'M';
+  if(n>=1e3) return (n/1e3).toFixed(1).replace(/\.0$/,'')+'k'; return ''+n; }
+function fixDur(d){ d=String(d||''); var m=d.match(/T(\d\d):(\d\d)/); if(m) return parseInt(m[1],10)+':'+m[2]; return d; }
+function firstArtist(a){ return String(a||'').split(',')[0].trim(); }
 
-/* ---------- Spotify login (PKCE — no password stored, no secret) ---------- */
-function randomString(len){ var a=new Uint8Array(len); crypto.getRandomValues(a);
-  return Array.from(a,function(b){return ('0'+b.toString(16)).slice(-2);}).join(''); }
-async function sha256b64(str){ var d=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  var b=''; new Uint8Array(d).forEach(function(x){b+=String.fromCharCode(x);});
-  return btoa(b).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
-
-async function login(){
-  var verifier=randomString(64);
-  localStorage.setItem('rd_verifier', verifier);
-  var challenge=await sha256b64(verifier);
-  var p=new URLSearchParams({client_id:CLIENT_ID, response_type:'code', redirect_uri:REDIRECT_URI,
-    code_challenge_method:'S256', code_challenge:challenge, scope:SCOPES, show_dialog:'true'});
-  location.href='https://accounts.spotify.com/authorize?'+p.toString();
+/* identity — MUST match mkKey_() in Code.gs exactly */
+function mkKey(artist, track){
+  var a=firstArtist(artist).toLowerCase().replace(/\s+/g,' ');
+  var t=String(track||'').trim().toLowerCase().replace(/\s+/g,' ');
+  return 'k:'+a+'::'+t;
 }
 
-async function handleRedirect(){
-  var q=new URLSearchParams(location.search);
-  if(q.get('error')){ toast('Spotify sign-in was cancelled'); history.replaceState({},'',REDIRECT_URI); return; }
-  var code=q.get('code'); if(!code) return;
-  var verifier=localStorage.getItem('rd_verifier');
-  var body=new URLSearchParams({client_id:CLIENT_ID, grant_type:'authorization_code',
-    code:code, redirect_uri:REDIRECT_URI, code_verifier:verifier});
-  var res=await fetch('https://accounts.spotify.com/api/token',{method:'POST',
-    headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:body});
-  var d=await res.json();
-  if(d.refresh_token){
-    localStorage.setItem('rd_refresh', d.refresh_token);
-    localStorage.setItem('rd_access', d.access_token);
-    localStorage.setItem('rd_exp', Date.now()+d.expires_in*1000);
-  }
-  history.replaceState({},'',REDIRECT_URI);
-}
-
-async function getToken(){
-  var exp=+localStorage.getItem('rd_exp')||0;
-  if(Date.now() < exp-60000) return localStorage.getItem('rd_access');
-  var refresh=localStorage.getItem('rd_refresh'); if(!refresh) return null;
-  var body=new URLSearchParams({client_id:CLIENT_ID, grant_type:'refresh_token', refresh_token:refresh});
-  var res=await fetch('https://accounts.spotify.com/api/token',{method:'POST',
-    headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:body});
-  var d=await res.json();
-  if(d.access_token){
-    localStorage.setItem('rd_access', d.access_token);
-    localStorage.setItem('rd_exp', Date.now()+d.expires_in*1000);
-    if(d.refresh_token) localStorage.setItem('rd_refresh', d.refresh_token);
-    return d.access_token;
-  }
-  return null;
-}
-function loggedIn(){ return !!localStorage.getItem('rd_refresh'); }
-function logout(){ ['rd_refresh','rd_access','rd_exp'].forEach(function(k){localStorage.removeItem(k);}); render(); }
-
-/* ---------- Spotify reads ---------- */
-function wait_(ms){ return new Promise(function(r){setTimeout(r,ms);}); }
-async function sp(path, _retry){
-  var t=await getToken(); if(!t) throw new Error('no token');
-  var res=await fetch('https://api.spotify.com/v1'+path,{headers:{Authorization:'Bearer '+t}});
-  if(res.status===429){
-    if(_retry) throw new Error('rate limited');
-    var after=parseInt(res.headers.get('Retry-After')||'2',10);
-    await wait_((after+1)*1000);
-    return sp(path, true);
-  }
-  if(!res.ok){ var e=await res.json().catch(function(){return {};}); throw new Error('HTTP '+res.status+': '+((e.error&&e.error.message)||'')); }
-  return res.json();
-}
-function mapTrack(t, source){
-  if(!t) return null;
-  var art = (t.album && t.album.images && t.album.images.length) ? t.album.images[t.album.images.length-1].url : '';
-  return {
-    Source:source,
-    Artist:(t.artists||[]).map(function(a){return a.name;}).join(', '),
-    ArtistIds:(t.artists||[]).map(function(a){return a.id;}).join(','),
-    Track:t.name||'', Album:(t.album&&t.album.name)||'',
-    Year:(t.album&&t.album.release_date)?t.album.release_date.slice(0,4):'',
-    Duration:msToTime(t.duration_ms), Popularity:(t.popularity!=null?t.popularity:''),
-    Genres:'', URI:t.uri||'', URL:(t.external_urls&&t.external_urls.spotify)||'', Art:art
-  };
-}
-async function pageItems(start, source, since, isLiked){
-  var out=[], url=start;
-  while(url){
-    var d=await sp(url);
-    var items=d.items||[];
-    for(var i=0;i<items.length;i++){
-      var it=items[i];
-      var tr=mapTrack(it.track||it.item, source);
-      if(!tr) continue;
-      tr._added = it.added_at || '';
-      if(since && tr._added && Date.parse(tr._added) <= since){
-        if(isLiked) return out;   /* likes come newest-first: everything after is older, stop */
-        else continue;            /* playlists aren't date-ordered: skip this one, keep scanning */
-      }
-      out.push(tr);
-    }
-    url = d.next ? d.next.replace('https://api.spotify.com/v1','') : null;
-  }
-  return out;
-}
-async function getLiked(since){ return pageItems('/me/tracks?limit=50','Liked',since,true); }
-async function findPlaylistId(name){
-  var target=String(name).toLowerCase().trim();
-  var url='/me/playlists?limit=50';
-  while(url){
-    var d=await sp(url);
-    var p=(d.items||[]).find(function(x){return x.name && x.name.toLowerCase().trim()===target;});
-    if(p) return p.id;
-    url=d.next?d.next.replace('https://api.spotify.com/v1',''):null;
-  }
-  return null;
-}
-async function findPlaylistContains(sub){
-  var s=String(sub).toLowerCase();
-  var url='/me/playlists?limit=50';
-  while(url){
-    var d=await sp(url);
-    var p=(d.items||[]).find(function(x){return x.name && x.name.toLowerCase().indexOf(s)>-1;});
-    if(p) return p.id;
-    url=d.next?d.next.replace('https://api.spotify.com/v1',''):null;
-  }
-  return null;
-}
-async function getPlaylist(name, source, since, fuzzy, link){
-  var id = plId(link);
-  if(!id) id = fuzzy ? await findPlaylistContains(name) : await findPlaylistId(name);
-  if(!id) return [];
-  return pageItems('/playlists/'+id+'/items?limit=100', source, since, false);
-}
-function lfmKey(r){ return (r.Artist||'').split(',')[0].trim() + '~~' + (r.Track||''); }
-async function enrichTracks(rows){
-  try{
-    if(!rows.length) return;
-    /* chunk to keep the JSONP URL a sane length */
-    for(var i=0;i<rows.length;i+=12){
-      var chunk=rows.slice(i,i+12);
-      var q=chunk.map(function(r){ return (r.Artist||'').split(',')[0].trim()+'~~'+(r.Track||''); }).join('||');
-      var data=await apiGet('action=enrich&q='+encodeURIComponent(q));
-      if(data && data.rows){ toast('Backend is out of date \u2014 redeploy Code.gs as a New version'); return; }
-      chunk.forEach(function(r){
-        var d=data&&data[lfmKey(r)];
-        if(d){
-          r.Genres=(d.tags||[]).join(', ');     /* Genres column now holds Last.fm tags */
-          r.Plays=d.plays||0;
-          r.Listeners=d.listeners||0;
-        }
-      });
-    }
-  }catch(e){ /* enrichment is best-effort — never block a save */ }
-}
+/* play links — no API, just searches on the places you actually listen */
+function bandcampUrl(r){ return 'https://bandcamp.com/search?q='+encodeURIComponent((r.Artist||'')+' '+(r.Track||'')); }
+function qobuzUrl(r){ return 'https://www.qobuz.com/gb-en/search?q='+encodeURIComponent((r.Artist||'')+' '+(r.Track||'')); }
+function youtubeUrl(r){ return 'https://www.youtube.com/results?search_query='+encodeURIComponent((r.Artist||'')+' '+(r.Track||'')); }
+function lastfmUrl(r){ return 'https://www.last.fm/music/'+encodeURIComponent(firstArtist(r.Artist))+'/_/'+encodeURIComponent(r.Track||''); }
 
 /* ---------- backend read (JSONP) + write (POST) ---------- */
 function apiGet(params){
   return new Promise(function(resolve,reject){
     var cb='rd_cb_'+Date.now()+'_'+Math.floor(Math.random()*9999);
     var s=document.createElement('script');
-    window[cb]=function(data){ resolve(data); delete window[cb]; s.remove(); };
-    s.onerror=function(){ reject(new Error('backend read failed')); s.remove(); };
+    var done=false;
+    window[cb]=function(data){ done=true; resolve(data); delete window[cb]; s.remove(); };
+    s.onerror=function(){ reject(new Error('backend unreachable — check the script URL / redeploy')); s.remove(); };
     s.src=APPS_SCRIPT_URL+'?callback='+cb+'&t='+Date.now()+(params?('&'+params):'');
     document.body.appendChild(s);
+    setTimeout(function(){ if(!done){ reject(new Error('backend timed out')); try{s.remove();}catch(e){} } }, 25000);
   });
 }
 function readSheet(){ return apiGet(''); }
@@ -353,167 +196,76 @@ function writeSheet(payload){
     headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(payload)});
 }
 
-/* ---------- Spotify writes (need the modify permission — Reconnect once) ---------- */
-async function spw(path, method, body, _retry){
-  var t=await getToken(); if(!t) throw new Error('no token');
-  var res=await fetch('https://api.spotify.com/v1'+path,{ method:method||'GET',
-    headers:{Authorization:'Bearer '+t, 'Content-Type':'application/json'},
-    body: body?JSON.stringify(body):undefined });
-  if(res.status===429){
-    if(_retry) throw new Error('rate limited');
-    var after=parseInt(res.headers.get('Retry-After')||'2',10);
-    await wait_((after+1)*1000);
-    return spw(path, method, body, true);
-  }
-  if(res.status===401) throw new Error('scope');
-  if(res.status===403){ var e403=await res.json().catch(function(){return {};}); throw new Error('forbidden:'+((e403.error&&e403.error.message)||'')); }
-  var txt=await res.text(); try{ return JSON.parse(txt); }catch(e){ return {}; }
-}
-async function myId(){ if(STATE._me) return STATE._me; var d=await sp('/me'); STATE._me=d.id; return d.id; }
-async function ensurePlaylist(name, link){
-  var id=plId(link);
-  if(!id) id=await findPlaylistId(name);
-  if(!id) id=await findPlaylistContains(String(name).toLowerCase());
-  if(id) return id;
-  var uid=await myId();
-  var d=await spw('/me/playlists','POST',{name:name, public:false, description:'Managed by Recent Decents'});
-  return d.id;
-}
-async function playlistUris(id){
-  var out=[], url='/playlists/'+id+'/items?limit=100';
-  while(url){ var d=await sp(url); (d.items||[]).forEach(function(it){
-    var tr=it.item||it.track; if(tr&&tr.uri) out.push(tr.uri); });
-    url=d.next?d.next.replace('https://api.spotify.com/v1',''):null; }
-  return out;
-}
-async function plAdd(id, uris){ for(var i=0;i<uris.length;i+=100){ await spw('/playlists/'+id+'/items','POST',{uris:uris.slice(i,i+100)}); } }
-async function plRemove(id, uris){
-  for(var i=0;i<uris.length;i+=100){
-    await spw('/playlists/'+id+'/items','DELETE',{items:uris.slice(i,i+100).map(function(u){return {uri:u};})});
-  }
-}
-
-/* ---------- On Rotation: add on Love, expire after 30 days ---------- */
-async function addToRotation(row, via){
+/* ---------- enrichment (Last.fm tags / plays / listeners) ---------- */
+function lfmKey(r){ return firstArtist(r.Artist)+'~~'+(r.Track||''); }
+async function enrichTracks(rows){
   try{
-    if(STATE.rotation.some(function(x){return x.URI===row.URI;})) return;
-    var id=await ensurePlaylist(ON_ROTATION_NAME, ON_ROTATION_PLAYLIST_LINK);
-    var have=await playlistUris(id);
-    if(have.indexOf(row.URI)===-1) await plAdd(id,[row.URI]);
-    var entry={URI:row.URI, Artist:row.Artist, Track:row.Track, Added:new Date().toISOString(), Via:via||'Love'};
-    STATE.rotation.push(entry);
-    writeSheet({action:'rotationAdd', uri:row.URI, artist:row.Artist, track:row.Track, added:entry.Added, via:entry.Via});
-    toast('Added to On Rotation');
-  }catch(e){
-    if(e.message==='scope'){
-      alert('Reconnect Spotify — tap Reconnect at the bottom and approve.');
-    } else if(e.message&&e.message.indexOf('forbidden')===0){
-      toast('Spotify blocked this — try reconnecting');
-    } else { toast('Could not reach On Rotation: '+e.message); }
-  }
-}
-async function runExpiry(){
-  try{
-    var cutoff=Date.now()-ROTATION_DAYS*86400000;
-    var due=STATE.rotation.filter(function(x){ return x.Added && Date.parse(x.Added) < cutoff; });
-    if(!due.length) return;
-    var id=plId(ON_ROTATION_PLAYLIST_LINK)||await findPlaylistId(ON_ROTATION_NAME); if(!id) return;
-    await plRemove(id, due.map(function(x){return x.URI;}));
-    due.forEach(function(x){ writeSheet({action:'rotationRemove', uri:x.URI}); });
-    var goneUris={}; due.forEach(function(x){ goneUris[x.URI]=1; });
-    STATE.rotation=STATE.rotation.filter(function(x){ return !goneUris[x.URI]; });
-  }catch(e){ /* silent — try again next open */ }
-}
-
-/* ---------- Picks: heavy oldies from Last.fm, triaged as cards ---------- */
-async function loadPicks(){
-  STATE.picks=[]; STATE.picksLoaded=true; render();
-  try{
-    var cand=await apiGet('action=picks');         /* [{artist,track,plays}] from Last.fm */
-    var onRot={}; STATE.rotation.forEach(function(x){ onRot[x.URI]=1; });
-    var dis={}; STATE.dismissed.forEach(function(u){ dis[u]=1; });
-    var saved={}; STATE.rows.forEach(function(r){ if(r.URI) saved[r.URI]=1; });
-    var picks=[];
-    for(var i=0;i<(cand||[]).length && picks.length<25;i++){
-      var c=cand[i];
-      try{
-        var d=await sp('/search?type=track&limit=1&q='+encodeURIComponent(c.artist+' '+c.track));
-        var t=(d.tracks&&d.tracks.items&&d.tracks.items[0]); if(!t) continue;
-        var m=mapTrack(t,'Heavy'); if(!m.URI) continue;
-        if(onRot[m.URI]||dis[m.URI]) continue;
-        m.Plays=c.plays;
-        picks.push(m);
-      }catch(e){}
+    if(!rows.length) return;
+    for(var i=0;i<rows.length;i+=12){
+      var chunk=rows.slice(i,i+12);
+      var q=chunk.map(lfmKey).join('||');
+      var data=await apiGet('action=enrich&q='+encodeURIComponent(q));
+      if(data && data.rows){ toast('Backend is out of date — redeploy Code.gs as a New version'); return; }
+      chunk.forEach(function(r){
+        var d=data&&data[lfmKey(r)];
+        if(d){ r.Genres=(d.tags||[]).join(', '); r.Plays=d.plays||0; r.Listeners=d.listeners||0; }
+      });
     }
-    STATE.picks=picks; render();
-  }catch(e){ toast('Could not load picks'); STATE.picks=[]; render(); }
-}
-async function acceptPick(uri){
-  var m=STATE.picks.find(function(x){return x.URI===uri;}); if(!m) return;
-  STATE.picks=STATE.picks.filter(function(x){return x.URI!==uri;}); render();
-  await addToRotation(m,'Heavy');
-}
-function dismissPick(uri){
-  STATE.dismissed.push(uri);
-  STATE.picks=STATE.picks.filter(function(x){return x.URI!==uri;});
-  writeSheet({action:'dismiss', uri:uri});
-  render();
+  }catch(e){ /* enrichment is best-effort — never block a save */ }
 }
 
-/* ---------- Monthly archive of Recent Decents ---------- */
-async function archiveMonth(){
-  if(!confirm('Archive the current Recent Decents playlist into a dated copy, then empty it for the new month?')) return;
-  toast('Archiving…');
-  try{
-    var id=plId(RECENT_DECENTS_PLAYLIST_LINK)||await findPlaylistId(RECENT_DECENTS_NAME);
-    if(!id){ toast('No "Recent Decents" playlist found'); return; }
-    var uris=await playlistUris(id);
-    if(!uris.length){ toast('Recent Decents is already empty'); return; }
-    var now=new Date(); var label=now.toLocaleString('en-GB',{month:'long'})+' '+now.getFullYear();
-    var archId=await ensurePlaylist('Recent Decents — '+label);
-    await plAdd(archId, uris);
-    await plRemove(id, uris);
-    toast('Archived '+uris.length+' to '+label);
-  }catch(e){ toast(e.message==='scope'?'Reconnect Spotify for playlist access':'Archive problem'); }
-}
+/* ---------- capture: Last.fm Loved tracks (+ Shazam via intake) ---------- */
+function mapLoved(o){
+  return { Source:'Loved', Artist:o.artist||'', Track:o.track||'', Album:o.album||'',
+    Year:o.year||'', Duration:o.duration||'', Popularity:'', Genres:'', Plays:0, Listeners:0,
+    URI:mkKey(o.artist,o.track), URL:'', Art:o.art||'', ArtistIds:'' }; }
 
-/* ---------- actions ---------- */
 async function doSync(btn){
-  if(btn){ btn.disabled=true; btn.querySelector('svg').classList.add('spin'); }
+  if(btn){ btn.disabled=true; var sv=btn.querySelector('svg'); if(sv) sv.classList.add('spin'); }
   try{
-    var since = STATE.baseline ? Date.parse(STATE.baseline) : 0;
+    var sinceUts = STATE.baseline ? Math.floor(Date.parse(STATE.baseline)/1000) : 0;
     var existing={}; STATE.rows.forEach(function(r){ if(r.URI) existing[r.URI]=1; });
-    var found=[];
-    found=found.concat(await getLiked(since));
-    await wait_(300);
-    var shaz=await getPlaylist('shazam','Shazam', since, true, SHAZAM_PLAYLIST_LINK);
-    if(!shaz.length && !plId(SHAZAM_PLAYLIST_LINK)){
-      var shazId=await findPlaylistContains('shazam');
-      if(!shazId) toast('Shazam playlist not found — paste its ID in settings');
-    }
-    found=found.concat(shaz);
-    await wait_(300);
-    found=found.concat(await getPlaylist('Recent Decents','Recent Decents', since, false, RECENT_DECENTS_PLAYLIST_LINK));
+
+    var resp = await apiGet('action=loved&since='+sinceUts);
+    var lovedRows = ((resp&&resp.tracks)||[]).map(mapLoved);
+    var shazamRows = (resp&&resp.shazams)||[];   /* already written server-side */
+
+    /* fresh loved tracks (dedup against what's already in the sheet) */
     var seen={}, fresh=[];
-    found.forEach(function(t){ if(t&&t.URI&&!existing[t.URI]&&!seen[t.URI]){ seen[t.URI]=1; fresh.push(t); } });
+    lovedRows.forEach(function(t){ if(t.URI && !existing[t.URI] && !seen[t.URI]){ seen[t.URI]=1; fresh.push(t); } });
+
     if(fresh.length){
       await enrichTracks(fresh);
       var today=new Date().toISOString().slice(0,10);
       fresh.forEach(function(t){ t.Status='New'; t.Date=today; });
       await writeSheet({action:'add', rows:fresh});
-      STATE.rows=fresh.concat(STATE.rows);
+    }
+
+    /* Shazam rows the server just pulled in (not already shown) */
+    var newShaz=shazamRows.filter(function(t){ return t.URI && !existing[t.URI] && !seen[t.URI]; });
+    newShaz.forEach(function(t){ seen[t.URI]=1; });
+
+    var incoming=fresh.concat(newShaz);
+    if(incoming.length){
+      STATE.rows=incoming.concat(STATE.rows);
       render();
-      toast(fresh.length+' new '+(fresh.length===1?'save':'saves'));
-    } else { toast('Up to date — nothing new'); }
-    /* backfill: enrich any existing rows that never got Last.fm data */
+      var bits=[]; if(fresh.length) bits.push(fresh.length+' loved'); if(newShaz.length) bits.push(newShaz.length+' Shazam');
+      toast(incoming.length+' new — '+bits.join(', '));
+    } else {
+      toast('Up to date — nothing new');
+    }
+
+    /* backfill: enrich anything (incl. new Shazams) that never got Last.fm data */
     var stale=STATE.rows.filter(function(r){ return r.URI && !r.Listeners && !(r.Genres&&String(r.Genres).length) && !Number(r.Plays); });
     if(stale.length){
       await enrichTracks(stale);
       stale.forEach(function(r){ writeSheet({action:'updateEnrichment', uri:r.URI, genres:r.Genres||'', plays:r.Plays||0, listeners:r.Listeners||0}); });
       render();
     }
-  }catch(e){ toast('Sync problem — check connection'); }
-  finally{ if(btn){ btn.disabled=false; btn.querySelector('svg').classList.remove('spin'); } }
+
+    runExpiry();
+  }catch(e){ toast('Sync error: '+((e&&e.message)||e)); }
+  finally{ if(btn){ btn.disabled=false; var sv2=btn.querySelector('svg'); if(sv2) sv2.classList.remove('spin'); } }
 }
 
 async function startFresh(){
@@ -523,6 +275,29 @@ async function startFresh(){
   render();
 }
 
+/* ---------- On Rotation (internal — Sheet + app, 30-day expiry) ---------- */
+function addToRotation(row, via){
+  if(STATE.rotation.some(function(x){return x.URI===row.URI;})) return;
+  var entry={URI:row.URI, Artist:row.Artist, Track:row.Track, Added:new Date().toISOString(), Via:via||'Love'};
+  STATE.rotation.push(entry);
+  writeSheet({action:'rotationAdd', uri:row.URI, artist:row.Artist, track:row.Track, added:entry.Added, via:entry.Via});
+  toast('Added to On Rotation');
+}
+function removeFromRotation(uri){
+  STATE.rotation=STATE.rotation.filter(function(x){return x.URI!==uri;});
+  writeSheet({action:'rotationRemove', uri:uri});
+  render();
+}
+function runExpiry(){
+  var cutoff=Date.now()-ROTATION_DAYS*86400000;
+  var due=STATE.rotation.filter(function(x){ return x.Added && Date.parse(x.Added) < cutoff; });
+  if(!due.length) return;
+  due.forEach(function(x){ writeSheet({action:'rotationRemove', uri:x.URI}); });
+  var gone={}; due.forEach(function(x){ gone[x.URI]=1; });
+  STATE.rotation=STATE.rotation.filter(function(x){ return !gone[x.URI]; });
+}
+
+/* ---------- status changes ---------- */
 function setStatus(uri, status){
   if(status==='Delete'){
     if(!confirm('Remove this entry from the sheet permanently?')){ render(); return; }
@@ -537,18 +312,81 @@ function setStatus(uri, status){
   if(status==='Love' && r) addToRotation(r,'Love');
 }
 
+/* ---------- Picks: heavy rotation, last 30 days ---------- */
+async function loadPicks(){
+  STATE.picks=[]; STATE.picksLoaded=true; render();
+  try{
+    var cand=await apiGet('action=picks');   /* [{artist,track,plays,album,year,duration,art}] */
+    var skip={}; STATE.rotation.forEach(function(x){skip[x.URI]=1;});
+    STATE.dismissed.forEach(function(u){skip[u]=1;}); STATE.rows.forEach(function(r){if(r.URI)skip[r.URI]=1;});
+    var picks=[];
+    (cand||[]).forEach(function(c){
+      var uri=mkKey(c.artist,c.track); if(skip[uri]) return;
+      picks.push({URI:uri, Artist:c.artist, Track:c.track, Plays:c.plays, Art:c.art||''});
+    });
+    STATE.picks=picks.slice(0,25); render();
+  }catch(e){ toast('Could not load picks'); STATE.picks=[]; render(); }
+}
+function acceptPick(uri){
+  var m=STATE.picks.find(function(x){return x.URI===uri;}); if(!m) return;
+  STATE.picks=STATE.picks.filter(function(x){return x.URI!==uri;}); render();
+  addToRotation(m,'Heavy');
+}
+function dismissPick(uri){
+  STATE.dismissed.push(uri);
+  STATE.picks=STATE.picks.filter(function(x){return x.URI!==uri;});
+  writeSheet({action:'dismiss', uri:uri}); render();
+}
+
+/* ---------- Passive "New to me" feed ---------- */
+async function loadNewToMe(){
+  STATE.newtome=[]; STATE.newtomeLoaded=true; render();
+  try{
+    var cand=await apiGet('action=newtome');   /* [{artist,track,userplays,album,year,duration,art}] */
+    var skip={}; STATE.rotation.forEach(function(x){skip[x.URI]=1;});
+    STATE.dismissed.forEach(function(u){skip[u]=1;}); STATE.rows.forEach(function(r){if(r.URI)skip[r.URI]=1;});
+    var out=[];
+    (cand||[]).forEach(function(c){
+      var uri=mkKey(c.artist,c.track); if(skip[uri]) return;
+      out.push({URI:uri, Artist:c.artist, Track:c.track, Album:c.album||'', Year:c.year||'',
+        Duration:c.duration||'', Art:c.art||'', UserPlays:c.userplays});
+    });
+    STATE.newtome=out; render();
+  }catch(e){ toast('Could not load new-to-me'); STATE.newtome=[]; render(); }
+}
+async function acceptNewToMe(uri){
+  var m=STATE.newtome.find(function(x){return x.URI===uri;}); if(!m) return;
+  STATE.newtome=STATE.newtome.filter(function(x){return x.URI!==uri;});
+  var row={Source:'Found', Artist:m.Artist, Track:m.Track, Album:m.Album, Year:m.Year, Duration:m.Duration,
+    Popularity:'', Genres:'', Plays:0, Listeners:0, URI:m.URI, URL:'', Art:m.Art, ArtistIds:'',
+    Status:'New', Date:new Date().toISOString().slice(0,10)};
+  await enrichTracks([row]);
+  await writeSheet({action:'add', rows:[row]});
+  STATE.rows=[row].concat(STATE.rows);
+  toast('Added · '+row.Artist); render();
+}
+function dismissNewToMe(uri){
+  STATE.dismissed.push(uri);
+  STATE.newtome=STATE.newtome.filter(function(x){return x.URI!==uri;});
+  writeSheet({action:'dismiss', uri:uri}); render();
+}
+
+/* ---------- manual add (iTunes search via backend) ---------- */
 async function runSearch(){
   var q=document.getElementById('q').value.trim(); if(!q) return;
   var box=document.getElementById('results'); box.innerHTML='<p class="meta" style="padding:8px 0">searching…</p>';
   try{
-    var d=await sp('/search?type=track&limit=10&q='+encodeURIComponent(q));
-    var items=(d.tracks&&d.tracks.items)||[];
-    if(!items.length){ box.innerHTML='<p class="meta" style="padding:8px 0">no matches</p>'; return; }
+    var items=await apiGet('action=isearch&q='+encodeURIComponent(q));
+    if(!items||!items.length){ box.innerHTML='<p class="meta" style="padding:8px 0">no matches</p>'; return; }
     box.innerHTML=items.map(function(t){
-      var m=mapTrack(t,'Manual'); STATE._cache=STATE._cache||{}; STATE._cache[m.URI]=m;
+      var uri=mkKey(t.artist,t.track);
+      var m={Source:'Manual', Artist:t.artist, Track:t.track, Album:t.album||'', Year:t.year||'',
+        Duration:t.duration||'', Popularity:'', Genres:'', Plays:0, Listeners:0,
+        URI:uri, URL:'', Art:t.art||'', ArtistIds:''};
+      STATE._cache[uri]=m;
       return '<div class="result"><img src="'+esc(m.Art)+'" alt=""><div class="ri">'+
         '<div class="ra">'+esc(m.Artist)+'</div><div class="rt">'+esc(m.Track)+' · '+esc(m.Album)+' · '+esc(m.Year)+'</div></div>'+
-        '<button onclick="addManual(\''+esc(m.URI)+'\')">add</button></div>';
+        '<button onclick="addManual(\''+esc(uri)+'\')">add</button></div>';
     }).join('');
   }catch(e){ box.innerHTML='<p class="meta" style="padding:8px 0">search problem</p>'; }
 }
@@ -568,12 +406,6 @@ async function addManual(uri){
 function counts(){ var c={All:STATE.rows.length}; STATUSES.forEach(function(s){c[s]=0;});
   STATE.rows.forEach(function(r){ var s=r.Status||'New'; if(c[s]!=null) c[s]++; }); return c; }
 
-function fmtNum(n){ n=Number(n)||0; if(n>=1e6) return (n/1e6).toFixed(1).replace(/\.0$/,'')+'M';
-  if(n>=1e3) return (n/1e3).toFixed(1).replace(/\.0$/,'')+'k'; return ''+n; }
-/* recover any durations Google Sheets mangled into a time-of-day */
-function fixDur(d){ d=String(d||''); var m=d.match(/T(\d\d):(\d\d)/); if(m) return parseInt(m[1],10)+':'+m[2]; return d; }
-function bandcampUrl(r){ return 'https://bandcamp.com/search?q='+encodeURIComponent((r.Artist||'')+' '+(r.Track||'')); }
-
 function cardHTML(r){
   var sleeve = r.Art ? '<img class="sleeve" src="'+esc(r.Art)+'" alt="">'
     : '<div class="sleeve"><span class="sleeve-fallback">'+esc((r.Track||r.Artist||'?').slice(0,1))+'</span></div>';
@@ -588,8 +420,10 @@ function cardHTML(r){
     .map(function(g){return '<span class="genre">'+esc(g)+'</span>';}).join('');
   var srcClass=esc((r.Source||'Manual').replace(/[^A-Za-z]/g,''));
   var links='<span class="links">'+
-    (r.URL?'<a class="lnk sp" href="'+esc(r.URL)+'" target="_blank" rel="noopener">Spotify</a>':'')+
-    '<a class="lnk bc" href="'+esc(bandcampUrl(r))+'" target="_blank" rel="noopener">Bandcamp</a></span>';
+    '<a class="lnk bc" href="'+esc(bandcampUrl(r))+'" target="_blank" rel="noopener">BC</a>'+
+    '<a class="lnk qo" href="'+esc(qobuzUrl(r))+'" target="_blank" rel="noopener">Qob</a>'+
+    '<a class="lnk yt" href="'+esc(youtubeUrl(r))+'" target="_blank" rel="noopener">YT</a>'+
+    '<a class="lnk lf" href="'+esc(lastfmUrl(r))+'" target="_blank" rel="noopener">fm</a></span>';
   return '<div class="card">'+sleeve+'<div class="cbody"><div class="crow"><div style="min-width:0">'+
     '<div class="artist">'+esc(r.Track)+'</div><div class="track">'+esc(r.Artist)+'</div>'+
     '<div class="meta">'+esc(meta)+'</div></div>'+
@@ -608,31 +442,62 @@ function pickCardHTML(r){
     '<button class="pick-dismiss" onclick="dismissPick(\''+esc(r.URI)+'\')">dismiss</button></div></div></div>';
 }
 
+function newToMeCardHTML(r){
+  var sleeve = r.Art ? '<img class="sleeve" src="'+esc(r.Art)+'" alt="">'
+    : '<div class="sleeve"><span class="sleeve-fallback">'+esc((r.Artist||'?').slice(0,1))+'</span></div>';
+  var up=Number(r.UserPlays); var pl=isNaN(up)?'':(up+' play'+(up===1?'':'s')+' all-time');
+  var meta=[String(r.Album||'').slice(0,24), pl].filter(Boolean).join(' · ').toUpperCase();
+  return '<div class="card">'+sleeve+'<div class="cbody"><div class="crow"><div style="min-width:0">'+
+    '<div class="artist">'+esc(r.Artist)+'</div><div class="track">'+esc(r.Track)+'</div>'+
+    '<div class="meta">'+esc(meta)+'</div></div></div>'+
+    '<div class="tags"><button class="pick-add" onclick="acceptNewToMe(\''+esc(r.URI)+'\')">+ Inbox</button>'+
+    '<button class="pick-dismiss" onclick="dismissNewToMe(\''+esc(r.URI)+'\')">dismiss</button></div></div></div>';
+}
+
+function rotationCardHTML(x){
+  var r={Artist:x.Artist, Track:x.Track};
+  var added=x.Added?new Date(x.Added):null;
+  var daysLeft=added?Math.max(0,Math.ceil(ROTATION_DAYS-(Date.now()-added.getTime())/86400000)):'';
+  var meta=[(x.Via||'').toUpperCase(), daysLeft!==''?(daysLeft+' DAYS LEFT'):''].filter(Boolean).join(' · ');
+  var links='<span class="links">'+
+    '<a class="lnk bc" href="'+esc(bandcampUrl(r))+'" target="_blank" rel="noopener">BC</a>'+
+    '<a class="lnk qo" href="'+esc(qobuzUrl(r))+'" target="_blank" rel="noopener">Qob</a>'+
+    '<a class="lnk yt" href="'+esc(youtubeUrl(r))+'" target="_blank" rel="noopener">YT</a>'+
+    '<a class="lnk lf" href="'+esc(lastfmUrl(r))+'" target="_blank" rel="noopener">fm</a></span>';
+  return '<div class="card"><div class="sleeve"><span class="sleeve-fallback">'+esc((x.Track||x.Artist||'?').slice(0,1))+'</span></div>'+
+    '<div class="cbody"><div class="crow"><div style="min-width:0">'+
+    '<div class="artist">'+esc(x.Track)+'</div><div class="track">'+esc(x.Artist)+'</div>'+
+    '<div class="meta">'+esc(meta)+'</div></div>'+
+    '<button class="pick-dismiss" onclick="removeFromRotation(\''+esc(x.URI)+'\')">remove</button>'+
+    '</div><div class="tags">'+links+'</div></div></div>';
+}
+
 function render(){
   var app=document.getElementById('app');
 
-  if(!loggedIn()){
+  if(APPS_SCRIPT_URL.indexOf('PASTE_')===0){
     app.innerHTML='<div class="connect"><div class="wordmark">Recent Decents</div>'+
-      '<p>Your discovery inbox. Sign in once with Spotify to pull in everything you Shazam, like, or drop into your Recent Decents playlist — then triage at your own pace.</p>'+
-      '<button onclick="login()">Connect Spotify</button>'+
-      '<div class="redirect-box"><div class="lbl">Redirect URL to add in Spotify (copy exactly)</div><code>'+esc(REDIRECT_URI)+'</code></div>'+
-      '</div>';
+      '<p>Almost there — paste your Apps Script web app URL into <b>APPS_SCRIPT_URL</b> at the top of this file, then reload.</p></div>';
     return;
   }
 
-  if(loggedIn() && !STATE.baseline){
+  if(!STATE.baseline){
     app.innerHTML='<div class="connect"><div class="wordmark">Start from now</div>'+
-      '<p>Recent Decents will only pull in music you save <b>from this point on</b> — your existing likes, Shazams and playlist history stay untouched in Spotify, so your inbox starts clean.</p>'+
-      '<p style="font-size:13px;color:var(--ink-3);margin-top:-14px">Anything older you want, you can always add by hand.</p>'+
+      '<p>Recent Decents pulls in tracks you <b>heart on Last.fm</b> (and Shazam) <b>from this point on</b>. Your back catalogue stays untouched, so your inbox starts clean.</p>'+
+      '<p style="font-size:13px;color:var(--ink-3);margin-top:-14px">Anything older you want, add it by hand any time.</p>'+
       '<button onclick="startFresh()">Start from now</button></div>';
     return;
   }
 
   var c=counts();
-  var tabs=['New','To listen','Love','Decent','Pass','All','Picks'].map(function(v){
-    var label=(v==='New')?'Inbox':v;
-    var ct=(v==='Picks')?(STATE.picksLoaded?STATE.picks.length:'')
-                        :(c[v]||0);
+  var TABS=['New','To listen','Love','Rotation','Decent','Pass','All','Picks','New-to-me'];
+  var tabs=TABS.map(function(v){
+    var label=(v==='New')?'Inbox':(v==='New-to-me'?'New to me':v);
+    var ct;
+    if(v==='Picks') ct=STATE.picksLoaded?STATE.picks.length:'';
+    else if(v==='New-to-me') ct=STATE.newtomeLoaded?STATE.newtome.length:'';
+    else if(v==='Rotation') ct=STATE.rotation.length;
+    else ct=c[v]||0;
     return '<button class="tab'+(STATE.view===v?' on':'')+'" onclick="goView(\''+v+'\')">'+label+
       (ct!==''?' <span class="ct">'+ct+'</span>':'')+'</button>';
   }).join('');
@@ -640,17 +505,27 @@ function render(){
   var listHTML;
   if(STATE.view==='Picks'){
     if(!STATE.picksLoaded){
-      listHTML='<div class="empty">heavy rotation picks from your last 30 days of listening'+
+      listHTML='<div class="empty">heavy rotation from your last 30 days of listening'+
         '<br><br><button class="pick-add" onclick="loadPicks()">Find this month\u2019s picks</button></div>';
     } else if(!STATE.picks.length){
       listHTML='<div class="empty">no new picks right now<br>everything you\u2019re playing is already sorted</div>';
-    } else {
-      listHTML=STATE.picks.map(pickCardHTML).join('');
-    }
+    } else { listHTML=STATE.picks.map(pickCardHTML).join(''); }
+  } else if(STATE.view==='New-to-me'){
+    if(!STATE.newtomeLoaded){
+      listHTML='<div class="empty">recent plays by artists you\u2019ve barely played before'+
+        '<br>the safety net for things you forgot to heart'+
+        '<br><br><button class="pick-add" onclick="loadNewToMe()">Find new-to-me</button></div>';
+    } else if(!STATE.newtome.length){
+      listHTML='<div class="empty">nothing new surfaced<br>nothing recent from unfamiliar artists</div>';
+    } else { listHTML=STATE.newtome.map(newToMeCardHTML).join(''); }
+  } else if(STATE.view==='Rotation'){
+    var rot=STATE.rotation.slice().sort(function(a,b){ return Date.parse(b.Added||0)-Date.parse(a.Added||0); });
+    listHTML = rot.length ? rot.map(rotationCardHTML).join('')
+      : '<div class="empty">on rotation is empty<br>mark something Love, or add a pick</div>';
   } else {
     var rows=STATE.rows.filter(function(r){ return STATE.view==='All' ? true : (r.Status||'New')===STATE.view; });
     listHTML = rows.length ? rows.map(cardHTML).join('')
-      : '<div class="empty">nothing here yet'+(STATE.view==='New'?'<br>tap sync to pull from spotify':'')+'</div>';
+      : '<div class="empty">nothing here yet'+(STATE.view==='New'?'<br>heart something on last.fm, then tap sync':'')+'</div>';
   }
 
   app.innerHTML=
@@ -665,64 +540,41 @@ function render(){
       '<div class="add-panel'+(STATE.addOpen?' open':'')+'">'+
         '<div class="search-row"><input id="q" placeholder="Artist or track…" onkeydown="if(event.key===\'Enter\')runSearch()"><button onclick="runSearch()">Search</button></div>'+
         '<div class="results" id="results"></div></div>'+
-      '<div class="tools"><button onclick="archiveMonth()">Archive this month</button>'+
-        '<button onclick="login()">Reconnect Spotify</button>'+
-        '<button onclick="debugPlaylists()">Debug</button></div>'+
+      '<div class="tools"><button onclick="checkConnection()">Check connection</button>'+
+        '<button onclick="resetBaseline()">Reset start point</button></div>'+
     '</div>';
 }
 
-/* ---------- forensic diagnostic ---------- */
-async function debugPlaylists(){
-  var L=[]; var t=await getToken();
-  /* 1. THE VERDICT: raw status for each pasted ID */
-  var pairs=[['Shazam',SHAZAM_PLAYLIST_LINK],['RD',RECENT_DECENTS_PLAYLIST_LINK],['OnRot',ON_ROTATION_PLAYLIST_LINK]];
-  for(var i=0;i<pairs.length;i++){
-    if(i>0) await wait_(400);
-    var id=plId(pairs[i][1]);
-    if(!id){ L.push(pairs[i][0]+': no ID pasted'); continue; }
-    try{
-      var res=await fetch('https://api.spotify.com/v1/playlists/'+id+'/items?limit=3',
-        {headers:{Authorization:'Bearer '+t}});
-      var body=await res.json().catch(function(){return {};});
-      if(res.ok){
-        var n=(body.items||[]).length;
-        var firstTrackNull = n>0 && !(body.items[0].item||body.items[0].track);
-        L.push(pairs[i][0]+': HTTP 200, '+n+' of '+(body.total!=null?body.total:'?')+' items'+(firstTrackNull?' (track data BLANK)':''));
-      }
-      else { L.push(pairs[i][0]+': HTTP '+res.status+' — '+((body.error&&body.error.message)||'?')); }
-    }catch(e){ L.push(pairs[i][0]+': network error'); }
-  }
-  L.push('————');
-  /* 2. supporting info: exact-name matches only */
-  try{
-    var all=[], url='/me/playlists?limit=50';
-    while(url){ var d=await sp(url); (d.items||[]).forEach(function(p){all.push(p);});
-      url=d.next?d.next.replace('https://api.spotify.com/v1',''):null; }
-    L.push('Total playlists: '+all.length);
-    ['my shazam tracks','recent decents','on rotation'].forEach(function(n){
-      all.filter(function(p){return p.name&&p.name.toLowerCase().trim()===n;})
-         .forEach(function(p){ L.push('"'+p.name+'" id='+p.id); });
-    });
-  }catch(e){ L.push('List error: '+e.message); }
-  alert(L.join('\n'));
-}
+function goView(v){ STATE.view=v; render(); }
 
-function goView(v){
-  STATE.view=v; render();
-  if(v==='Picks' && !STATE.picksLoaded){ /* user taps Find picks — keeps Last.fm calls intentional */ }
+async function checkConnection(){
+  toast('Checking…');
+  try{ var d=await apiGet('action=ping');
+    toast(d&&d.ok ? ('Backend OK · Last.fm '+(d.lastfm?'OK':'no response')) : 'Backend reachable, odd response');
+  }catch(e){ toast('Backend error: '+((e&&e.message)||e)); }
+}
+function resetBaseline(){
+  if(!confirm('Reset the "start from now" point? Future syncs will only bring in loves from the moment you confirm.')) return;
+  STATE.baseline=''; render();
 }
 
 /* ---------- start ---------- */
 (async function(){
-  await handleRedirect();
-  if(loggedIn()){
-    try{ var d=await readSheet();
-      STATE.rows=(d&&d.rows)||[]; STATE.baseline=(d&&d.baseline)||'';
-      STATE.rotation=(d&&d.rotation)||[]; STATE.dismissed=(d&&d.dismissed)||[];
-    }catch(e){ /* show empty, sync will populate */ }
-  }
+  if(APPS_SCRIPT_URL.indexOf('PASTE_')===0){ render(); return; }
+  try{
+    var d=await readSheet();
+    var rows=(d&&d.rows)||[];
+    /* newest first, then collapse any duplicates (e.g. a Shazam you also loved) by key */
+    rows.reverse();
+    var seen={}, deduped=[];
+    rows.forEach(function(r){ var k=r.URI||mkKey(r.Artist,r.Track); if(!seen[k]){ seen[k]=1; deduped.push(r); } });
+    STATE.rows=deduped;
+    STATE.baseline=(d&&d.baseline)||'';
+    STATE.rotation=(d&&d.rotation)||[];
+    STATE.dismissed=(d&&d.dismissed)||[];
+  }catch(e){ /* show empty; sync will populate */ }
   render();
-  if(loggedIn() && STATE.baseline) runExpiry();
+  if(STATE.baseline) runExpiry();
 })();
 </script>
 </body>
