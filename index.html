@@ -59,6 +59,8 @@
   .chip{flex:0 0 auto;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;
     color:var(--ink-2);background:transparent;border:1px solid var(--line-2);border-radius:100px;padding:5px 12px;cursor:pointer;white-space:nowrap}
   .chip.on{color:#16130F;background:var(--accent);border-color:var(--accent);font-weight:700}
+  .chipct{font-size:10px;color:var(--ink-3)}
+  .chip.on .chipct{color:#16130F}
 
   .list{padding:12px 14px 4px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:9px;display:flex;gap:12px}
@@ -519,7 +521,9 @@ function sectionTabsHTML(c){
 
 function chipsHTML(c){
   return '<div class="chips">'+FILTERS.map(function(f){
-    return '<button class="chip'+(STATE.statusFilter===f?' on':'')+'" onclick="setFilter(\''+f+'\')">'+f+'</button>';
+    var ct=(f==='All')?STATE.rows.length:(c[f]||0);
+    return '<button class="chip'+(STATE.statusFilter===f?' on':'')+'" onclick="setFilter(\''+f+'\')">'+f+
+      ' <span class="chipct">'+ct+'</span></button>';
   }).join('')+'</div>';
 }
 
@@ -582,6 +586,7 @@ function render(){
 
 /* ---------- navigation ---------- */
 function goSection(s){
+  if(s==='inbox') STATE.statusFilter='New';
   STATE.section=s; render();
   if(s==='picks' && !STATE.picksLoading) loadPicks();
   if(s==='newtome' && !STATE.newtomeLoading) loadNewToMe();
