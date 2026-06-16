@@ -18,6 +18,7 @@
     --line:rgba(237,230,216,0.10); --line-2:rgba(237,230,216,0.18);
     --ink:#EDE6D8; --ink-2:#A89E90; --ink-3:#6F665B;
     --accent:#E08A3C; --accent-ink:#F0B071; --accent-soft:rgba(224,138,60,0.16);
+    --violet:#A99FD4; --violet-soft:rgba(150,140,200,0.16);
   }
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   body{background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;
@@ -39,7 +40,7 @@
   .spin{animation:spin 1s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
 
-  /* tabs */
+  /* section tabs */
   .tabs{display:flex;gap:0;padding:12px 20px 0;overflow-x:auto;scrollbar-width:none}
   .tabs::-webkit-scrollbar{display:none}
   .tab{flex:0 0 auto;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;
@@ -48,6 +49,16 @@
   .tab .ct{font-size:10px;color:var(--ink-3)}
   .tab.on{color:var(--ink);border-bottom-color:var(--accent)}
   .tab.on .ct{color:var(--accent-ink)}
+  .tab.disc{color:var(--violet)}
+  .tab.disc.on{border-bottom-color:var(--violet)}
+  .tab.disc.on .ct{color:var(--violet)}
+
+  /* status filter chips (inside Inbox) */
+  .chips{display:flex;gap:7px;padding:11px 14px 2px;overflow-x:auto;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;
+    color:var(--ink-2);background:transparent;border:1px solid var(--line-2);border-radius:100px;padding:5px 12px;cursor:pointer;white-space:nowrap}
+  .chip.on{color:#16130F;background:var(--accent);border-color:var(--accent);font-weight:700}
 
   .list{padding:12px 14px 4px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:9px;display:flex;gap:12px}
@@ -74,6 +85,7 @@
     color:var(--ink-2);border:1px solid var(--line)}
   .pick-add{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.05em;padding:7px 14px;border-radius:100px;
     background:var(--accent);color:#16130F;border:none;cursor:pointer;font-weight:700}
+  .pick-add.v{background:var(--violet);color:#1b1622}
   .pick-dismiss{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.05em;padding:7px 13px;border-radius:100px;
     background:transparent;color:var(--ink-2);border:1px solid var(--line-2);cursor:pointer}
   .tools{display:flex;gap:8px;margin-top:12px}
@@ -147,16 +159,17 @@ var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjuAnaMshKcnqyeC
 /* ============================================================ */
 
 var STATUSES = ['New','To listen','Love','Decent','Pass','Delete'];
+var FILTERS  = ['New','To listen','Love','Decent','Pass','All'];
 var ROTATION_DAYS = 30;
 
 var STATE = { rows: [], baseline: '', rotation: [], dismissed: [],
-              picks: [], picksLoaded: false, newtome: [], newtomeLoaded: false,
-              view: 'New', addOpen: false, _cache: {} };
+              picks: [], picksLoaded: false, picksLoading: false,
+              newtome: [], newtomeLoaded: false, newtomeLoading: false,
+              section: 'inbox', statusFilter: 'New', addOpen: false, _cache: {} };
 
 /* ---------- tiny helpers ---------- */
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
-function msToTime(ms){ if(!ms) return ''; var s=Math.round(ms/1000); return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2); }
 function toast(msg){ var t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
   clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},2600); }
 function fmtNum(n){ n=Number(n)||0; if(n>=1e6) return (n/1e6).toFixed(1).replace(/\.0$/,'')+'M';
@@ -176,6 +189,13 @@ function bandcampUrl(r){ return 'https://bandcamp.com/search?q='+encodeURICompon
 function qobuzUrl(r){ return 'https://www.qobuz.com/gb-en/search?q='+encodeURIComponent((r.Artist||'')+' '+(r.Track||'')); }
 function youtubeUrl(r){ return 'https://www.youtube.com/results?search_query='+encodeURIComponent((r.Artist||'')+' '+(r.Track||'')); }
 function lastfmUrl(r){ return 'https://www.last.fm/music/'+encodeURIComponent(firstArtist(r.Artist))+'/_/'+encodeURIComponent(r.Track||''); }
+function linksHTML(r){
+  return '<span class="links">'+
+    '<a class="lnk bc" href="'+esc(bandcampUrl(r))+'" target="_blank" rel="noopener">BC</a>'+
+    '<a class="lnk qo" href="'+esc(qobuzUrl(r))+'" target="_blank" rel="noopener">Qob</a>'+
+    '<a class="lnk yt" href="'+esc(youtubeUrl(r))+'" target="_blank" rel="noopener">YT</a>'+
+    '<a class="lnk lf" href="'+esc(lastfmUrl(r))+'" target="_blank" rel="noopener">fm</a></span>';
+}
 
 /* ---------- backend read (JSONP) + write (POST) ---------- */
 function apiGet(params){
@@ -223,14 +243,29 @@ function mapLoved(o){
 async function doSync(btn){
   if(btn){ btn.disabled=true; var sv=btn.querySelector('svg'); if(sv) sv.classList.add('spin'); }
   try{
+    /* refresh from the sheet first — picks up Shazam rows Zapier wrote straight into Saves */
+    var before=STATE.rows.length;
+    try{
+      var sheet=await readSheet();
+      if(sheet){
+        var sr=(sheet.rows||[]); sr.reverse();
+        var sseen={}, sded=[];
+        sr.forEach(function(r){ var k=r.URI||mkKey(r.Artist,r.Track); if(!sseen[k]){ sseen[k]=1; sded.push(r); } });
+        STATE.rows=sded;
+        if(sheet.rotation) STATE.rotation=sheet.rotation;
+        if(sheet.dismissed) STATE.dismissed=sheet.dismissed;
+        if(sheet.baseline) STATE.baseline=sheet.baseline;
+        render();
+      }
+    }catch(e){}
+    var arrived=Math.max(0, STATE.rows.length-before);
+
     var sinceUts = STATE.baseline ? Math.floor(Date.parse(STATE.baseline)/1000) : 0;
     var existing={}; STATE.rows.forEach(function(r){ if(r.URI) existing[r.URI]=1; });
 
     var resp = await apiGet('action=loved&since='+sinceUts);
     var lovedRows = ((resp&&resp.tracks)||[]).map(mapLoved);
-    var shazamRows = (resp&&resp.shazams)||[];   /* already written server-side */
 
-    /* fresh loved tracks (dedup against what's already in the sheet) */
     var seen={}, fresh=[];
     lovedRows.forEach(function(t){ if(t.URI && !existing[t.URI] && !seen[t.URI]){ seen[t.URI]=1; fresh.push(t); } });
 
@@ -239,23 +274,18 @@ async function doSync(btn){
       var today=new Date().toISOString().slice(0,10);
       fresh.forEach(function(t){ t.Status='New'; t.Date=today; });
       await writeSheet({action:'add', rows:fresh});
+      STATE.rows=fresh.concat(STATE.rows);
+      render();
     }
 
-    /* Shazam rows the server just pulled in (not already shown) */
-    var newShaz=shazamRows.filter(function(t){ return t.URI && !existing[t.URI] && !seen[t.URI]; });
-    newShaz.forEach(function(t){ seen[t.URI]=1; });
-
-    var incoming=fresh.concat(newShaz);
-    if(incoming.length){
-      STATE.rows=incoming.concat(STATE.rows);
-      render();
-      var bits=[]; if(fresh.length) bits.push(fresh.length+' loved'); if(newShaz.length) bits.push(newShaz.length+' Shazam');
-      toast(incoming.length+' new — '+bits.join(', '));
+    var totalNew=fresh.length+arrived;
+    if(totalNew){
+      var bits=[]; if(fresh.length) bits.push(fresh.length+' loved'); if(arrived) bits.push(arrived+' Shazam');
+      toast(totalNew+' new — '+bits.join(', '));
     } else {
       toast('Up to date — nothing new');
     }
 
-    /* backfill: enrich anything (incl. new Shazams) that never got Last.fm data */
     var stale=STATE.rows.filter(function(r){ return r.URI && !r.Listeners && !(r.Genres&&String(r.Genres).length) && !Number(r.Plays); });
     if(stale.length){
       await enrichTracks(stale);
@@ -278,7 +308,7 @@ async function startFresh(){
 /* ---------- On Rotation (internal — Sheet + app, 30-day expiry) ---------- */
 function addToRotation(row, via){
   if(STATE.rotation.some(function(x){return x.URI===row.URI;})) return;
-  var entry={URI:row.URI, Artist:row.Artist, Track:row.Track, Added:new Date().toISOString(), Via:via||'Love'};
+  var entry={URI:row.URI, Artist:row.Artist, Track:row.Track, Art:row.Art||'', Added:new Date().toISOString(), Via:via||'Love'};
   STATE.rotation.push(entry);
   writeSheet({action:'rotationAdd', uri:row.URI, artist:row.Artist, track:row.Track, added:entry.Added, via:entry.Via});
   toast('Added to On Rotation');
@@ -314,9 +344,10 @@ function setStatus(uri, status){
 
 /* ---------- Picks: heavy rotation, last 30 days ---------- */
 async function loadPicks(){
-  STATE.picks=[]; STATE.picksLoaded=true; render();
+  if(STATE.picksLoading) return;
+  STATE.picksLoading=true; STATE.picksLoaded=true; STATE.picks=[]; render();
   try{
-    var cand=await apiGet('action=picks');   /* [{artist,track,plays,album,year,duration,art}] */
+    var cand=await apiGet('action=picks');
     var skip={}; STATE.rotation.forEach(function(x){skip[x.URI]=1;});
     STATE.dismissed.forEach(function(u){skip[u]=1;}); STATE.rows.forEach(function(r){if(r.URI)skip[r.URI]=1;});
     var picks=[];
@@ -324,8 +355,9 @@ async function loadPicks(){
       var uri=mkKey(c.artist,c.track); if(skip[uri]) return;
       picks.push({URI:uri, Artist:c.artist, Track:c.track, Plays:c.plays, Art:c.art||''});
     });
-    STATE.picks=picks.slice(0,25); render();
-  }catch(e){ toast('Could not load picks'); STATE.picks=[]; render(); }
+    STATE.picks=picks.slice(0,25);
+  }catch(e){ toast('Could not load picks'); STATE.picks=[]; }
+  finally{ STATE.picksLoading=false; render(); }
 }
 function acceptPick(uri){
   var m=STATE.picks.find(function(x){return x.URI===uri;}); if(!m) return;
@@ -340,9 +372,10 @@ function dismissPick(uri){
 
 /* ---------- Passive "New to me" feed ---------- */
 async function loadNewToMe(){
-  STATE.newtome=[]; STATE.newtomeLoaded=true; render();
+  if(STATE.newtomeLoading) return;
+  STATE.newtomeLoading=true; STATE.newtomeLoaded=true; STATE.newtome=[]; render();
   try{
-    var cand=await apiGet('action=newtome');   /* [{artist,track,userplays,album,year,duration,art}] */
+    var cand=await apiGet('action=newtome');
     var skip={}; STATE.rotation.forEach(function(x){skip[x.URI]=1;});
     STATE.dismissed.forEach(function(u){skip[u]=1;}); STATE.rows.forEach(function(r){if(r.URI)skip[r.URI]=1;});
     var out=[];
@@ -351,8 +384,9 @@ async function loadNewToMe(){
       out.push({URI:uri, Artist:c.artist, Track:c.track, Album:c.album||'', Year:c.year||'',
         Duration:c.duration||'', Art:c.art||'', UserPlays:c.userplays});
     });
-    STATE.newtome=out; render();
-  }catch(e){ toast('Could not load new-to-me'); STATE.newtome=[]; render(); }
+    STATE.newtome=out;
+  }catch(e){ toast('Could not load new-to-me'); STATE.newtome=[]; }
+  finally{ STATE.newtomeLoading=false; render(); }
 }
 async function acceptNewToMe(uri){
   var m=STATE.newtome.find(function(x){return x.URI===uri;}); if(!m) return;
@@ -386,7 +420,7 @@ async function runSearch(){
       STATE._cache[uri]=m;
       return '<div class="result"><img src="'+esc(m.Art)+'" alt=""><div class="ri">'+
         '<div class="ra">'+esc(m.Artist)+'</div><div class="rt">'+esc(m.Track)+' · '+esc(m.Album)+' · '+esc(m.Year)+'</div></div>'+
-        '<button onclick="addManual(\''+esc(uri)+'\')">add</button></div>';
+        '<button data-act="add-manual" data-uri="'+esc(uri)+'">add</button></div>';
     }).join('');
   }catch(e){ box.innerHTML='<p class="meta" style="padding:8px 0">search problem</p>'; }
 }
@@ -419,16 +453,11 @@ function cardHTML(r){
   var genres=(r.Genres||'').split(',').map(function(g){return g.trim();}).filter(Boolean)
     .map(function(g){return '<span class="genre">'+esc(g)+'</span>';}).join('');
   var srcClass=esc((r.Source||'Manual').replace(/[^A-Za-z]/g,''));
-  var links='<span class="links">'+
-    '<a class="lnk bc" href="'+esc(bandcampUrl(r))+'" target="_blank" rel="noopener">BC</a>'+
-    '<a class="lnk qo" href="'+esc(qobuzUrl(r))+'" target="_blank" rel="noopener">Qob</a>'+
-    '<a class="lnk yt" href="'+esc(youtubeUrl(r))+'" target="_blank" rel="noopener">YT</a>'+
-    '<a class="lnk lf" href="'+esc(lastfmUrl(r))+'" target="_blank" rel="noopener">fm</a></span>';
   return '<div class="card">'+sleeve+'<div class="cbody"><div class="crow"><div style="min-width:0">'+
     '<div class="artist">'+esc(r.Track)+'</div><div class="track">'+esc(r.Artist)+'</div>'+
     '<div class="meta">'+esc(meta)+'</div></div>'+
-    '<select class="status" data-s="'+esc(r.Status||'New')+'" onchange="setStatus(\''+esc(r.URI)+'\',this.value)">'+opts+'</select>'+
-    '</div><div class="tags"><span class="src '+srcClass+'">'+esc(r.Source||'Manual')+'</span>'+playsBadge+lisBadge+genres+links+'</div></div></div>';
+    '<select class="status" data-uri="'+esc(r.URI)+'" data-s="'+esc(r.Status||'New')+'">'+opts+'</select>'+
+    '</div><div class="tags"><span class="src '+srcClass+'">'+esc(r.Source||'Manual')+'</span>'+playsBadge+lisBadge+genres+linksHTML(r)+'</div></div></div>';
 }
 
 function pickCardHTML(r){
@@ -438,8 +467,8 @@ function pickCardHTML(r){
   return '<div class="card">'+sleeve+'<div class="cbody"><div class="crow"><div style="min-width:0">'+
     '<div class="artist">'+esc(r.Artist)+'</div><div class="track">'+esc(r.Track)+'</div>'+
     '<div class="meta">'+('▶ '+plays+' PLAYS THIS MONTH')+'</div></div></div>'+
-    '<div class="tags"><button class="pick-add" onclick="acceptPick(\''+esc(r.URI)+'\')">+ On Rotation</button>'+
-    '<button class="pick-dismiss" onclick="dismissPick(\''+esc(r.URI)+'\')">dismiss</button></div></div></div>';
+    '<div class="tags"><button class="pick-add v" data-act="accept-pick" data-uri="'+esc(r.URI)+'">+ On Rotation</button>'+
+    '<button class="pick-dismiss" data-act="dismiss-pick" data-uri="'+esc(r.URI)+'">dismiss</button></div></div></div>';
 }
 
 function newToMeCardHTML(r){
@@ -450,26 +479,46 @@ function newToMeCardHTML(r){
   return '<div class="card">'+sleeve+'<div class="cbody"><div class="crow"><div style="min-width:0">'+
     '<div class="artist">'+esc(r.Artist)+'</div><div class="track">'+esc(r.Track)+'</div>'+
     '<div class="meta">'+esc(meta)+'</div></div></div>'+
-    '<div class="tags"><button class="pick-add" onclick="acceptNewToMe(\''+esc(r.URI)+'\')">+ Inbox</button>'+
-    '<button class="pick-dismiss" onclick="dismissNewToMe(\''+esc(r.URI)+'\')">dismiss</button></div></div></div>';
+    '<div class="tags"><button class="pick-add v" data-act="accept-ntm" data-uri="'+esc(r.URI)+'">+ Inbox</button>'+
+    '<button class="pick-dismiss" data-act="dismiss-ntm" data-uri="'+esc(r.URI)+'">dismiss</button></div></div></div>';
 }
 
 function rotationCardHTML(x){
   var r={Artist:x.Artist, Track:x.Track};
+  var saved=STATE.rows.find(function(s){return s.URI===x.URI;});
+  var art=(x.Art)||(saved&&saved.Art)||'';
+  var sleeve = art ? '<img class="sleeve" src="'+esc(art)+'" alt="">'
+    : '<div class="sleeve"><span class="sleeve-fallback">'+esc((x.Track||x.Artist||'?').slice(0,1))+'</span></div>';
   var added=x.Added?new Date(x.Added):null;
   var daysLeft=added?Math.max(0,Math.ceil(ROTATION_DAYS-(Date.now()-added.getTime())/86400000)):'';
   var meta=[(x.Via||'').toUpperCase(), daysLeft!==''?(daysLeft+' DAYS LEFT'):''].filter(Boolean).join(' · ');
-  var links='<span class="links">'+
-    '<a class="lnk bc" href="'+esc(bandcampUrl(r))+'" target="_blank" rel="noopener">BC</a>'+
-    '<a class="lnk qo" href="'+esc(qobuzUrl(r))+'" target="_blank" rel="noopener">Qob</a>'+
-    '<a class="lnk yt" href="'+esc(youtubeUrl(r))+'" target="_blank" rel="noopener">YT</a>'+
-    '<a class="lnk lf" href="'+esc(lastfmUrl(r))+'" target="_blank" rel="noopener">fm</a></span>';
-  return '<div class="card"><div class="sleeve"><span class="sleeve-fallback">'+esc((x.Track||x.Artist||'?').slice(0,1))+'</span></div>'+
+  return '<div class="card">'+sleeve+
     '<div class="cbody"><div class="crow"><div style="min-width:0">'+
     '<div class="artist">'+esc(x.Track)+'</div><div class="track">'+esc(x.Artist)+'</div>'+
     '<div class="meta">'+esc(meta)+'</div></div>'+
-    '<button class="pick-dismiss" onclick="removeFromRotation(\''+esc(x.URI)+'\')">remove</button>'+
-    '</div><div class="tags">'+links+'</div></div></div>';
+    '<button class="pick-dismiss" data-act="rot-remove" data-uri="'+esc(x.URI)+'">remove</button>'+
+    '</div><div class="tags">'+linksHTML(r)+'</div></div></div>';
+}
+
+function sectionTabsHTML(c){
+  var defs=[['inbox','Inbox',false],['rotation','Rotation',false],['picks','Picks',true],['newtome','New to me',true]];
+  return defs.map(function(d){
+    var id=d[0], label=d[1], disc=d[2];
+    var ct='';
+    if(id==='inbox') ct=c['New']||0;
+    else if(id==='rotation') ct=STATE.rotation.length;
+    else if(id==='picks') ct=STATE.picksLoaded?STATE.picks.length:'';
+    else if(id==='newtome') ct=STATE.newtomeLoaded?STATE.newtome.length:'';
+    var mark=disc?'\u2726 ':'';
+    return '<button class="tab'+(STATE.section===id?' on':'')+(disc?' disc':'')+'" onclick="goSection(\''+id+'\')">'+mark+esc(label)+
+      (ct!==''?' <span class="ct">'+ct+'</span>':'')+'</button>';
+  }).join('');
+}
+
+function chipsHTML(c){
+  return '<div class="chips">'+FILTERS.map(function(f){
+    return '<button class="chip'+(STATE.statusFilter===f?' on':'')+'" onclick="setFilter(\''+f+'\')">'+f+'</button>';
+  }).join('')+'</div>';
 }
 
 function render(){
@@ -480,7 +529,6 @@ function render(){
       '<p>Almost there — paste your Apps Script web app URL into <b>APPS_SCRIPT_URL</b> at the top of this file, then reload.</p></div>';
     return;
   }
-
   if(!STATE.baseline){
     app.innerHTML='<div class="connect"><div class="wordmark">Start from now</div>'+
       '<p>Recent Decents pulls in tracks you <b>heart on Last.fm</b> (and Shazam) <b>from this point on</b>. Your back catalogue stays untouched, so your inbox starts clean.</p>'+
@@ -490,42 +538,26 @@ function render(){
   }
 
   var c=counts();
-  var TABS=['New','To listen','Love','Rotation','Decent','Pass','All','Picks','New-to-me'];
-  var tabs=TABS.map(function(v){
-    var label=(v==='New')?'Inbox':(v==='New-to-me'?'New to me':v);
-    var ct;
-    if(v==='Picks') ct=STATE.picksLoaded?STATE.picks.length:'';
-    else if(v==='New-to-me') ct=STATE.newtomeLoaded?STATE.newtome.length:'';
-    else if(v==='Rotation') ct=STATE.rotation.length;
-    else ct=c[v]||0;
-    return '<button class="tab'+(STATE.view===v?' on':'')+'" onclick="goView(\''+v+'\')">'+label+
-      (ct!==''?' <span class="ct">'+ct+'</span>':'')+'</button>';
-  }).join('');
+  var listHTML, chipBar='';
 
-  var listHTML;
-  if(STATE.view==='Picks'){
-    if(!STATE.picksLoaded){
-      listHTML='<div class="empty">heavy rotation from your last 30 days of listening'+
-        '<br><br><button class="pick-add" onclick="loadPicks()">Find this month\u2019s picks</button></div>';
-    } else if(!STATE.picks.length){
-      listHTML='<div class="empty">no new picks right now<br>everything you\u2019re playing is already sorted</div>';
-    } else { listHTML=STATE.picks.map(pickCardHTML).join(''); }
-  } else if(STATE.view==='New-to-me'){
-    if(!STATE.newtomeLoaded){
-      listHTML='<div class="empty">recent plays by artists you\u2019ve barely played before'+
-        '<br>the safety net for things you forgot to heart'+
-        '<br><br><button class="pick-add" onclick="loadNewToMe()">Find new-to-me</button></div>';
-    } else if(!STATE.newtome.length){
-      listHTML='<div class="empty">nothing new surfaced<br>nothing recent from unfamiliar artists</div>';
-    } else { listHTML=STATE.newtome.map(newToMeCardHTML).join(''); }
-  } else if(STATE.view==='Rotation'){
+  if(STATE.section==='inbox'){
+    chipBar=chipsHTML(c);
+    var rows=STATE.rows.filter(function(r){ return STATE.statusFilter==='All' ? true : (r.Status||'New')===STATE.statusFilter; });
+    if(rows.length){ listHTML=rows.map(cardHTML).join(''); }
+    else if(STATE.statusFilter==='New'){ listHTML='<div class="empty">inbox is clear'+'<br>heart something on last.fm, then tap sync</div>'; }
+    else { listHTML='<div class="empty">nothing in '+esc(STATE.statusFilter.toLowerCase())+'</div>'; }
+  } else if(STATE.section==='rotation'){
     var rot=STATE.rotation.slice().sort(function(a,b){ return Date.parse(b.Added||0)-Date.parse(a.Added||0); });
     listHTML = rot.length ? rot.map(rotationCardHTML).join('')
       : '<div class="empty">on rotation is empty<br>mark something Love, or add a pick</div>';
-  } else {
-    var rows=STATE.rows.filter(function(r){ return STATE.view==='All' ? true : (r.Status||'New')===STATE.view; });
-    listHTML = rows.length ? rows.map(cardHTML).join('')
-      : '<div class="empty">nothing here yet'+(STATE.view==='New'?'<br>heart something on last.fm, then tap sync':'')+'</div>';
+  } else if(STATE.section==='picks'){
+    if(STATE.picksLoading) listHTML='<div class="empty">finding this month\u2019s picks…</div>';
+    else if(!STATE.picks.length) listHTML='<div class="empty">no new picks right now<br>everything you\u2019re playing is already sorted</div>';
+    else listHTML=STATE.picks.map(pickCardHTML).join('');
+  } else { /* newtome */
+    if(STATE.newtomeLoading) listHTML='<div class="empty">finding new-to-me…</div>';
+    else if(!STATE.newtome.length) listHTML='<div class="empty">nothing new surfaced<br>no recent plays from unfamiliar artists</div>';
+    else listHTML=STATE.newtome.map(newToMeCardHTML).join('');
   }
 
   app.innerHTML=
@@ -534,7 +566,8 @@ function render(){
       '<button class="sync-btn" onclick="doSync(this)"><svg viewBox="0 0 16 16" fill="none">'+
         '<path d="M14 8a6 6 0 1 1-1.8-4.3M14 2v3.5h-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Sync</button>'+
     '</div></div>'+
-    '<div class="tabs">'+tabs+'</div>'+
+    '<div class="tabs">'+sectionTabsHTML(c)+'</div>'+
+    chipBar+
     '<div class="list">'+listHTML+'</div>'+
     '<div class="dock"><button class="add-toggle" onclick="STATE.addOpen=!STATE.addOpen;render()">+ Add a track</button>'+
       '<div class="add-panel'+(STATE.addOpen?' open':'')+'">'+
@@ -545,13 +578,35 @@ function render(){
     '</div>';
 }
 
-function goView(v){ STATE.view=v; render(); }
+/* ---------- navigation ---------- */
+function goSection(s){
+  STATE.section=s; render();
+  if(s==='picks' && !STATE.picksLoading) loadPicks();
+  if(s==='newtome' && !STATE.newtomeLoading) loadNewToMe();
+}
+function setFilter(f){ STATE.statusFilter=f; render(); }
 
-async function checkConnection(){
+/* ---------- delegated actions (apostrophe-safe — keys live in data-uri, never in inline JS) ---------- */
+function appClick(e){
+  var el=e.target.closest('[data-act]'); if(!el) return;
+  var act=el.getAttribute('data-act'), uri=el.getAttribute('data-uri')||'';
+  if(act==='accept-pick') acceptPick(uri);
+  else if(act==='dismiss-pick') dismissPick(uri);
+  else if(act==='accept-ntm') acceptNewToMe(uri);
+  else if(act==='dismiss-ntm') dismissNewToMe(uri);
+  else if(act==='add-manual') addManual(uri);
+  else if(act==='rot-remove') removeFromRotation(uri);
+}
+function appChange(e){
+  var sel=e.target.closest('select.status'); if(!sel) return;
+  setStatus(sel.getAttribute('data-uri'), sel.value);
+}
+
+function checkConnection(){
   toast('Checking…');
-  try{ var d=await apiGet('action=ping');
+  apiGet('action=ping').then(function(d){
     toast(d&&d.ok ? ('Backend OK · Last.fm '+(d.lastfm?'OK':'no response')) : 'Backend reachable, odd response');
-  }catch(e){ toast('Backend error: '+((e&&e.message)||e)); }
+  }).catch(function(e){ toast('Backend error: '+((e&&e.message)||e)); });
 }
 function resetBaseline(){
   if(!confirm('Reset the "start from now" point? Future syncs will only bring in loves from the moment you confirm.')) return;
@@ -559,13 +614,18 @@ function resetBaseline(){
 }
 
 /* ---------- start ---------- */
+(function(){
+  var app=document.getElementById('app');
+  app.addEventListener('click', appClick);
+  app.addEventListener('change', appChange);
+})();
+
 (async function(){
   if(APPS_SCRIPT_URL.indexOf('PASTE_')===0){ render(); return; }
   try{
     var d=await readSheet();
     var rows=(d&&d.rows)||[];
-    /* newest first, then collapse any duplicates (e.g. a Shazam you also loved) by key */
-    rows.reverse();
+    rows.reverse();   /* newest first */
     var seen={}, deduped=[];
     rows.forEach(function(r){ var k=r.URI||mkKey(r.Artist,r.Track); if(!seen[k]){ seen[k]=1; deduped.push(r); } });
     STATE.rows=deduped;
