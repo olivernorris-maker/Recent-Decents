@@ -228,7 +228,7 @@ async function enrichTracks(rows){
       if(data && data.rows){ toast('Backend is out of date — redeploy Code.gs as a New version'); return; }
       chunk.forEach(function(r){
         var d=data&&data[lfmKey(r)];
-        if(d){ r.Genres=(d.tags||[]).join(', '); r.Plays=d.plays||0; r.Listeners=d.listeners||0; }
+        if(d){ r.Genres=(d.tags||[]).join(', '); r.Plays=d.plays||0; r.Listeners=d.listeners||0; if(d.art) r.Art=d.art; }
       });
     }
   }catch(e){ /* enrichment is best-effort — never block a save */ }
@@ -286,10 +286,12 @@ async function doSync(btn){
       toast('Up to date — nothing new');
     }
 
-    var stale=STATE.rows.filter(function(r){ return r.URI && !r.Listeners && !(r.Genres&&String(r.Genres).length) && !Number(r.Plays); });
+    var needsEnrich=function(r){ return !r.Listeners && !(r.Genres&&String(r.Genres).length) && !Number(r.Plays); };
+    var needsArt=function(r){ return !r.Art || /i\.scdn\.co/.test(String(r.Art)); };
+    var stale=STATE.rows.filter(function(r){ return r.URI && (needsEnrich(r) || needsArt(r)); });
     if(stale.length){
       await enrichTracks(stale);
-      stale.forEach(function(r){ writeSheet({action:'updateEnrichment', uri:r.URI, genres:r.Genres||'', plays:r.Plays||0, listeners:r.Listeners||0}); });
+      stale.forEach(function(r){ writeSheet({action:'updateEnrichment', uri:r.URI, genres:r.Genres||'', plays:r.Plays||0, listeners:r.Listeners||0, art:r.Art||''}); });
       render();
     }
 
