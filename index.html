@@ -84,17 +84,16 @@
   .fmtpick{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
   .fmtpick button{flex:1;min-width:64px;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:11px;border-radius:10px;background:transparent;border:1px solid var(--line-2);color:var(--ink);cursor:pointer}
   .fmtpick button:hover{border-color:var(--violet);color:var(--violet)}
-  /* listen player */
-  #ytplayer{width:100%;aspect-ratio:16/9;border:none;border-radius:10px;overflow:hidden;background:#000;display:block}
-  .ytwrap{padding:12px 14px 2px}
-  .lnow{font-family:'Space Mono',monospace;font-size:11px;color:var(--accent-ink);letter-spacing:.04em;padding:8px 16px 2px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .lqlist{padding:6px 14px 4px}
-  .lq{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;margin-bottom:7px;cursor:pointer;background:var(--card)}
-  .lq.on{border-color:var(--accent);background:var(--accent-soft)}
-  .lqn{font-family:'Space Mono',monospace;font-size:10px;color:var(--ink-3);width:18px;flex:0 0 auto}
-  .lqt{flex:1;min-width:0;font-family:'Fraunces',serif;font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .lqa{font-size:11px;color:var(--ink-2);white-space:nowrap;max-width:38%;overflow:hidden;text-overflow:ellipsis;flex:0 0 auto}
-  .banner{font-family:'Space Mono',monospace;font-size:10.5px;color:var(--accent-ink);background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;padding:9px 12px;margin:10px 14px;letter-spacing:.03em;text-align:center;line-height:1.5}
+  /* status triage dropdown */
+  .status{font-family:'Space Mono',monospace;font-size:10.5px;letter-spacing:.03em;color:var(--ink);background:var(--panel);border:1px solid var(--line-2);border-radius:7px;padding:5px 26px 5px 9px;cursor:pointer;flex:0 0 auto;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23E08A3C' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center}
+  .status:focus{outline:none;border-color:var(--accent)}
+  .status option{background:var(--panel);color:var(--ink)}
+  /* per-card inline video */
+  .ytplay{font-family:'Space Mono',monospace;font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:4px;border:1px solid var(--line-2);background:transparent;color:#D98A8A;cursor:pointer}
+  .ytplay.on{background:rgba(217,138,138,.16);border-color:#D98A8A;color:#E9A9A9}
+  .cardvid{margin-top:10px}
+  .ytembed{width:100%;aspect-ratio:16/9;border:none;border-radius:10px;display:block;background:#000}
+  .ytload{padding:14px;text-align:center;font-family:'Space Mono',monospace;font-size:11px;color:var(--ink-3);letter-spacing:.04em}
   .tools{display:flex;gap:8px;margin-top:12px}
   .tools button{flex:1;font-family:'Space Mono',monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:10px;border-radius:10px;background:transparent;border:1px solid var(--line);color:var(--ink-3);cursor:pointer}
   .tools button:hover{border-color:var(--accent);color:var(--accent-ink)}
@@ -124,7 +123,6 @@
 <body>
 <div id="app" class="wrap"></div>
 <div id="toast" class="toast"></div>
-<script src="https://www.youtube.com/iframe_api"></script>
 <script>
 var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjuAnaMshKcnqyeCJyWgmWWv2zaARIfUEKqcFJ_AkwlXFet_kNu9LJd5iCY9nPwsHu/exec';
 
@@ -138,12 +136,8 @@ var STATE={ rows:[], baseline:'', rotation:[], dismissed:[],
   newtome:[], newtomeLoaded:false, newtomeLoading:false,
   similar:[], similarLoaded:false, similarLoading:false,
   deep:{active:null, pending:null, past:[], pastLoaded:false, openPast:null},
-  listen:{queue:[], index:0},
   section:'inbox', statusFilter:'New', addOpen:false, noteEdit:null, deepNoteEdit:null,
-  scrobbleOn:false, ytOn:false, _cache:{}, _albums:{} };
-
-var ytReady=false, ytPlayer=null;
-window.onYouTubeIframeAPIReady=function(){ ytReady=true; if(STATE.section==='listen') listenStart(); };
+  scrobbleOn:false, ytOn:false, openVid:{}, _cache:{}, _albums:{} };
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},2600); }
@@ -158,7 +152,7 @@ function lastfmUrl(r){ return 'https://www.last.fm/music/'+encodeURIComponent(fi
 function linksHTML(r){ return '<span class="links"><a class="lnk bc" href="'+esc(bandcampUrl(r))+'" target="_blank" rel="noopener">BC</a><a class="lnk qo" href="'+esc(qobuzUrl(r))+'" target="_blank" rel="noopener">Qob</a><a class="lnk yt" href="'+esc(youtubeUrl(r))+'" target="_blank" rel="noopener">YT</a><a class="lnk lf" href="'+esc(lastfmUrl(r))+'" target="_blank" rel="noopener">fm</a></span>'; }
 
 function apiGet(params){ return new Promise(function(resolve,reject){ var cb='rd_cb_'+Date.now()+'_'+Math.floor(Math.random()*9999), s=document.createElement('script'), done=false;
-  window[cb]=function(d){ done=true; resolve(d); delete window[cb]; s.remove(); };
+  window[cb]=function(d){ done=true; if(d&&d.error){ reject(new Error(d.error)); } else { resolve(d); } delete window[cb]; s.remove(); };
   s.onerror=function(){ reject(new Error('backend unreachable — check the script URL / redeploy')); s.remove(); };
   s.src=APPS_SCRIPT_URL+'?callback='+cb+'&t='+Date.now()+(params?('&'+params):''); document.body.appendChild(s);
   setTimeout(function(){ if(!done){ reject(new Error('backend timed out')); try{s.remove();}catch(e){} } },25000); }); }
@@ -229,14 +223,20 @@ async function addManual(uri){ var m=STATE._cache&&STATE._cache[uri]; if(!m) ret
 
 /* ---------- Listen (YouTube) ---------- */
 async function resolveVid(row){ if(row.YT) return row.YT; try{ var r=await apiGet('action=ytsearch&q='+encodeURIComponent(firstArtist(row.Artist)+' '+row.Track)); var vid=r&&r.videoId; if(vid){ row.YT=vid; writeSheet({action:'updateYT',uri:row.URI,yt:vid}); } return vid||''; }catch(e){ return ''; } }
-async function listenStart(){ if(!ytReady||!STATE.ytOn) return; var q=STATE.listen.queue; if(!q.length) return; var holder=document.getElementById('ytplayer'); if(!holder) return;
-  var vid=await resolveVid(q[STATE.listen.index]); if(!vid){ toast('No video found for this track'); return; }
-  if(ytPlayer&&ytPlayer.loadVideoById){ try{ ytPlayer.loadVideoById(vid); return; }catch(e){} }
-  ytPlayer=new YT.Player('ytplayer',{ videoId:vid, playerVars:{autoplay:1,playsinline:1,rel:0}, events:{ onStateChange:function(e){ if(e.data===YT.PlayerState.ENDED) listenNext(); } } }); }
-function listenNext(){ if(STATE.listen.index<STATE.listen.queue.length-1) listenJump(STATE.listen.index+1); }
-async function listenJump(i){ STATE.listen.index=i; var row=STATE.listen.queue[i]; document.querySelectorAll('.lq').forEach(function(el,idx){ el.classList.toggle('on', idx===i); }); var now=document.querySelector('.lnow'); if(now) now.textContent=row.Track+' · '+firstArtist(row.Artist);
-  var vid=await resolveVid(row); if(!vid){ toast('No video found'); return; } if(ytPlayer&&ytPlayer.loadVideoById){ try{ ytPlayer.loadVideoById(vid); return; }catch(e){} } listenStart(); }
-function destroyPlayer(){ if(ytPlayer){ try{ ytPlayer.destroy(); }catch(e){} ytPlayer=null; } }
+function ytIframe(vid){ return '<iframe class="ytembed" src="https://www.youtube.com/embed/'+encodeURIComponent(vid)+'?autoplay=1&rel=0&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>'; }
+function findCardEl(uri){ var els=document.querySelectorAll('.card[data-uri]'); for(var i=0;i<els.length;i++){ if(els[i].getAttribute('data-uri')===uri) return els[i]; } return null; }
+async function toggleVid(uri){
+  if(uri in STATE.openVid){ delete STATE.openVid[uri]; var ec=findCardEl(uri); if(ec){ var w=ec.querySelector('.cardvid'); if(w) w.remove(); var b=ec.querySelector('.ytplay'); if(b) b.classList.remove('on'); } return; }
+  if(!STATE.ytOn){ toast('Add a YouTube key in Code.gs to play in-app (see handoff)'); return; }
+  STATE.openVid[uri]='';                                  // loading marker (persists across renders)
+  var el=findCardEl(uri); if(el){ var btn=el.querySelector('.ytplay'); if(btn) btn.classList.add('on'); var body=el.querySelector('.cbody'); var lw=document.createElement('div'); lw.className='cardvid'; lw.innerHTML='<div class="ytload">finding video…</div>'; body.appendChild(lw); }
+  var row=STATE.rows.find(function(x){return x.URI===uri;})||STATE.rotation.find(function(x){return x.URI===uri;});
+  var vid=row?await resolveVid(row):'';
+  if(!(uri in STATE.openVid)) return;                     // closed again while we were searching
+  if(!vid){ delete STATE.openVid[uri]; var e2=findCardEl(uri); if(e2){ var w2=e2.querySelector('.cardvid'); if(w2) w2.remove(); var b2=e2.querySelector('.ytplay'); if(b2) b2.classList.remove('on'); } toast('No video found for this track'); return; }
+  STATE.openVid[uri]=vid;
+  var e3=findCardEl(uri); if(e3){ var w3=e3.querySelector('.cardvid'); if(w3) w3.innerHTML=ytIframe(vid); }
+}
 
 /* ---------- Deep Listen ---------- */
 async function loadDeepPast(){ try{ var rows=await apiGet('action=deeplog'); STATE.deep.past=rows||[]; STATE.deep.pastLoaded=true; render(); }catch(e){ STATE.deep.pastLoaded=true; render(); } }
@@ -270,8 +270,10 @@ function cardHTML(r){ var opts=STATUSES.map(function(s){ return '<option'+(((r.S
   var genres=(r.Genres||'').split(',').map(function(g){return g.trim();}).filter(Boolean).map(function(g){return '<span class="genre">'+esc(g)+'</span>';}).join('');
   var sc=esc((r.Source||'Manual').replace(/[^A-Za-z]/g,'')); var note=String(r.Note||'');
   var nb='<button class="noteicon'+(note?' has':'')+'" data-act="note-edit" data-uri="'+esc(r.URI)+'">✎ note</button>';
+  var vbtn='<button class="ytplay'+((r.URI in STATE.openVid)?' on':'')+'" data-act="ytplay" data-uri="'+esc(r.URI)+'">▶ video</button>';
+  var vidWrap=''; if(r.URI in STATE.openVid){ var v=STATE.openVid[r.URI]; vidWrap='<div class="cardvid">'+(v?ytIframe(v):'<div class="ytload">finding video…</div>')+'</div>'; }
   var editor=''; if(STATE.noteEdit===r.URI){ editor='<div class="noteedit"><textarea data-noteinput="1">'+esc(note)+'</textarea><div class="row"><button class="nsave" data-act="note-save" data-uri="'+esc(r.URI)+'">save</button><button class="ncancel" data-act="note-cancel">cancel</button></div></div>'; } else if(note){ editor='<div class="notetext">'+esc(note)+'</div>'; }
-  return '<div class="card">'+sleeveHTML(r.Art,r.Track||r.Artist)+'<div class="cbody"><div class="crow"><div style="min-width:0"><div class="artist">'+esc(r.Track)+'</div><div class="track">'+esc(r.Artist)+'</div><div class="meta">'+esc(meta)+'</div></div><select class="status" data-uri="'+esc(r.URI)+'" data-s="'+esc(r.Status||'New')+'">'+opts+'</select></div><div class="tags"><span class="src '+sc+'">'+esc(r.Source||'Manual')+'</span>'+pb+lb+genres+nb+linksHTML(r)+'</div>'+editor+'</div></div>'; }
+  return '<div class="card" data-uri="'+esc(r.URI)+'">'+sleeveHTML(r.Art,r.Track||r.Artist)+'<div class="cbody"><div class="crow"><div style="min-width:0"><div class="artist">'+esc(r.Track)+'</div><div class="track">'+esc(r.Artist)+'</div><div class="meta">'+esc(meta)+'</div></div><select class="status" data-uri="'+esc(r.URI)+'" data-s="'+esc(r.Status||'New')+'">'+opts+'</select></div><div class="tags"><span class="src '+sc+'">'+esc(r.Source||'Manual')+'</span>'+pb+lb+genres+nb+vbtn+linksHTML(r)+'</div>'+editor+vidWrap+'</div></div>'; }
 function pickCardHTML(r){ var plays=Number(r.Plays)||0; return '<div class="card">'+sleeveHTML(r.Art,r.Artist)+'<div class="cbody"><div class="crow"><div style="min-width:0"><div class="artist">'+esc(r.Artist)+'</div><div class="track">'+esc(r.Track)+'</div><div class="meta">'+('▶ '+plays+' PLAYS THIS MONTH')+'</div></div></div><div class="tags"><button class="pick-add v" data-act="accept-pick" data-uri="'+esc(r.URI)+'">+ On Rotation</button><button class="pick-dismiss" data-act="dismiss-pick" data-uri="'+esc(r.URI)+'">dismiss</button></div></div></div>'; }
 function newToMeCardHTML(r){ var up=Number(r.UserPlays); var pl=isNaN(up)?'':(up+' play'+(up===1?'':'s')+' all-time'); var meta=[String(r.Album||'').slice(0,24),pl].filter(Boolean).join(' · ').toUpperCase();
   return '<div class="card">'+sleeveHTML(r.Art,r.Artist)+'<div class="cbody"><div class="crow"><div style="min-width:0"><div class="artist">'+esc(r.Artist)+'</div><div class="track">'+esc(r.Track)+'</div><div class="meta">'+esc(meta)+'</div></div></div><div class="tags"><button class="pick-add v" data-act="accept-ntm" data-uri="'+esc(r.URI)+'">+ Inbox</button><button class="pick-dismiss" data-act="dismiss-ntm" data-uri="'+esc(r.URI)+'">dismiss</button></div></div></div>'; }
@@ -283,13 +285,6 @@ function starsHTML(no,stars){ var out=''; for(var n=1;n<=3;n++){ out+='<button c
 function deepCardHTML(t){ var nb=''; if(STATE.deepNoteEdit===String(t.no)){ nb='<div class="noteedit"><textarea data-noteinput="1">'+esc(t.note||'')+'</textarea><div class="row"><button class="nsave" data-act="dnote-save" data-no="'+esc(t.no)+'">save</button><button class="ncancel" data-act="dnote-cancel">cancel</button></div></div>'; } else if(t.done&&t.note){ nb='<div class="notetext">'+esc(t.note)+'</div>'; } else { nb='<div style="margin-top:8px"><button class="noteicon'+(t.note?' has':'')+'" data-act="dnote-edit" data-no="'+esc(t.no)+'">✎ '+(t.note?'note':'add note')+'</button></div>'; }
   return '<div class="dcard'+(t.done?' done':'')+'"><div class="dtop"><span class="dno">'+esc(t.no)+'</span><span class="dtrack">'+esc(t.track)+'</span><span class="ddur">'+esc(t.duration||'')+'</span></div><div class="tags" style="margin-top:9px">'+starsHTML(t.no,t.stars)+'</div>'+nb+'</div>'; }
 
-function listenSectionHTML(){ var q=STATE.listen.queue;
-  if(!q.length) return '<div class="empty">nothing in "to listen"<br>move tracks to <b>To listen</b>, then come back</div>';
-  var banner = STATE.ytOn ? '' : '<div class="banner">Add a YouTube Data API key in Code.gs to play in-app (see the handoff doc). Until then, use the YT link on each track.</div>';
-  var cur=q[STATE.listen.index]||q[0];
-  var list=q.map(function(r,i){ return '<div class="lq'+(i===STATE.listen.index?' on':'')+'" data-act="listen-jump" data-i="'+i+'"><span class="lqn">'+(i+1)+'</span><span class="lqt">'+esc(r.Track)+'</span><span class="lqa">'+esc(firstArtist(r.Artist))+'</span></div>'; }).join('');
-  var player = STATE.ytOn ? '<div class="ytwrap"><div id="ytplayer"></div></div><div class="lnow">'+esc(cur.Track)+' · '+esc(firstArtist(cur.Artist))+'</div>' : banner;
-  return player+'<div class="lqlist">'+list+'</div>'; }
 
 function deepSectionHTML(){ var d=STATE.deep;
   if(d.active){ var s=d.active,total=s.tracks.length,done=s.tracks.filter(function(t){return t.done;}).length,pct=total?Math.round(done/total*100):0;
@@ -306,9 +301,9 @@ function deepSectionHTML(){ var d=STATE.deep;
       return '<div class="past" data-act="past-open" data-id="'+esc(id)+'"><div class="pa">'+esc(g.album)+'</div><div class="pm">'+esc(g.artist)+' · '+esc(g.date)+' · '+esc(g.format)+' · '+g.tracks.length+' TRACKS</div></div>'; }).join('')+'</div>'; } }
   return search+past; }
 
-function sectionTabsHTML(c){ var defs=[['inbox','Inbox',false],['rotation','Rotation',false],['listen','Listen',false],['picks','Picks',true],['newtome','New to me',true],['similar','Similar',true],['deep','Deep Listen',true]];
+function sectionTabsHTML(c){ var defs=[['inbox','Inbox',false],['rotation','Rotation',false],['picks','Picks',true],['newtome','New to me',true],['similar','Similar',true],['deep','Deep Listen',true]];
   return defs.map(function(d){ var id=d[0],label=d[1],disc=d[2],ct='';
-    if(id==='inbox') ct=c['New']||0; else if(id==='rotation') ct=STATE.rotation.length; else if(id==='listen') ct=c['To listen']||0;
+    if(id==='inbox') ct=c['New']||0; else if(id==='rotation') ct=STATE.rotation.length;
     else if(id==='picks') ct=STATE.picksLoaded?STATE.picks.length:''; else if(id==='newtome') ct=STATE.newtomeLoaded?STATE.newtome.length:''; else if(id==='similar') ct=STATE.similarLoaded?STATE.similar.length:'';
     var mark=disc?'\u2726 ':''; return '<button class="tab'+(STATE.section===id?' on':'')+(disc?' disc':'')+'" onclick="goSection(\''+id+'\')">'+mark+esc(label)+(ct!==''?' <span class="ct">'+ct+'</span>':'')+'</button>'; }).join(''); }
 function chipsHTML(c){ return '<div class="chips">'+FILTERS.map(function(f){ var ct=(f==='All')?STATE.rows.length:(c[f]||0); return '<button class="chip'+(STATE.statusFilter===f?' on':'')+'" onclick="setFilter(\''+f+'\')">'+f+' <span class="chipct">'+ct+'</span></button>'; }).join('')+'</div>'; }
@@ -319,20 +314,17 @@ function render(){ var app=document.getElementById('app');
   var c=counts(), body='', chipBar='';
   if(STATE.section==='inbox'){ chipBar=chipsHTML(c); var rows=STATE.rows.filter(function(r){ return STATE.statusFilter==='All'?true:(r.Status||'New')===STATE.statusFilter; }); body='<div class="list">'+(rows.length?rows.map(cardHTML).join(''):'<div class="empty">'+(STATE.statusFilter==='New'?'inbox is clear<br>heart something on last.fm, then tap sync':'nothing in '+esc(STATE.statusFilter.toLowerCase()))+'</div>')+'</div>'; }
   else if(STATE.section==='rotation'){ var rot=STATE.rotation.slice().sort(function(a,b){return Date.parse(b.Added||0)-Date.parse(a.Added||0);}); body='<div class="list">'+(rot.length?rot.map(rotationCardHTML).join(''):'<div class="empty">on rotation is empty<br>mark something Love, or add a pick</div>')+'</div>'; }
-  else if(STATE.section==='listen'){ body=listenSectionHTML(); }
   else if(STATE.section==='picks'){ body='<div class="list">'+(STATE.picksLoading?'<div class="empty">finding this month\u2019s picks…</div>':(!STATE.picks.length?'<div class="empty">no new picks right now<br>everything you\u2019re playing is already sorted</div>':STATE.picks.map(pickCardHTML).join('')))+'</div>'; }
   else if(STATE.section==='newtome'){ body='<div class="list">'+(STATE.newtomeLoading?'<div class="empty">finding new-to-me…</div>':(!STATE.newtome.length?'<div class="empty">nothing new surfaced<br>no recent plays from unfamiliar artists</div>':STATE.newtome.map(newToMeCardHTML).join('')))+'</div>'; }
   else if(STATE.section==='similar'){ body='<div class="list">'+(STATE.similarLoading?'<div class="empty">finding similar artists…</div>':(!STATE.similar.length?'<div class="empty">no fresh similar artists<br>everything close is already in your world</div>':STATE.similar.map(similarCardHTML).join('')))+'</div>'; }
   else { body=deepSectionHTML(); }
-  var dock=(STATE.section==='deep'||STATE.section==='listen')?'':'<div class="dock"><button class="add-toggle" onclick="STATE.addOpen=!STATE.addOpen;render()">+ Add a track</button><div class="add-panel'+(STATE.addOpen?' open':'')+'"><div class="search-row"><input id="q" placeholder="Artist or track…" onkeydown="if(event.key===\'Enter\')runSearch()"><button onclick="runSearch()">Search</button></div><div class="results" id="results"></div></div><div class="tools"><button onclick="checkConnection()">Check connection</button><button onclick="resetBaseline()">Reset start point</button></div></div>';
-  app.innerHTML='<div class="face"><div class="face-top"><div><div class="wordmark">Recent Decents</div><div class="sub">discovery inbox</div></div><button class="sync-btn" onclick="doSync(this)"><svg viewBox="0 0 16 16" fill="none"><path d="M14 8a6 6 0 1 1-1.8-4.3M14 2v3.5h-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Sync</button></div></div><div class="tabs">'+sectionTabsHTML(c)+'</div>'+chipBar+body+dock;
+  var dock=(STATE.section==='deep')?'':'<div class="dock"><button class="add-toggle" onclick="STATE.addOpen=!STATE.addOpen;render()">+ Add a track</button><div class="add-panel'+(STATE.addOpen?' open':'')+'"><div class="search-row"><input id="q" placeholder="Artist or track…" onkeydown="if(event.key===\'Enter\')runSearch()"><button onclick="runSearch()">Search</button></div><div class="results" id="results"></div></div><div class="tools"><button onclick="checkConnection()">Check connection</button><button onclick="resetBaseline()">Reset start point</button></div></div>';
+  app.innerHTML='<div class="face"><div class="face-top"><div><div class="wordmark" onclick="goSection(\'inbox\')" style="cursor:pointer" title="Home — Inbox">Recent Decents</div><div class="sub">discovery inbox</div></div><button class="sync-btn" onclick="doSync(this)"><svg viewBox="0 0 16 16" fill="none"><path d="M14 8a6 6 0 1 1-1.8-4.3M14 2v3.5h-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Sync</button></div></div><div class="tabs">'+sectionTabsHTML(c)+'</div>'+chipBar+body+dock;
   if(STATE.noteEdit||STATE.deepNoteEdit){ var ta=document.querySelector('textarea[data-noteinput]'); if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); } }
-  if(STATE.section==='listen' && ytReady && STATE.ytOn && STATE.listen.queue.length){ destroyPlayer(); listenStart(); }
 }
 
-function goSection(s){ if(STATE.section==='listen' && s!=='listen') destroyPlayer();
+function goSection(s){
   if(s==='inbox') STATE.statusFilter='New';
-  if(s==='listen'){ STATE.listen.queue=STATE.rows.filter(function(r){return (r.Status||'New')==='To listen';}); STATE.listen.index=0; }
   STATE.section=s; STATE.deep.openPast=null; render();
   if(s==='picks' && !STATE.picksLoading) loadPicks();
   if(s==='newtome' && !STATE.newtomeLoading) loadNewToMe();
@@ -346,10 +338,10 @@ function appClick(e){ var el=e.target.closest('[data-act]'); if(!el) return; var
   else if(act==='accept-ntm') acceptNewToMe(uri); else if(act==='dismiss-ntm') dismissNewToMe(uri);
   else if(act==='accept-sim') acceptSimilar(uri); else if(act==='dismiss-sim') dismissSimilar(uri);
   else if(act==='add-manual') addManual(uri); else if(act==='rot-remove') removeFromRotation(uri);
+  else if(act==='ytplay') toggleVid(uri);
   else if(act==='note-edit'){ STATE.noteEdit=uri; STATE.deepNoteEdit=null; render(); }
   else if(act==='note-cancel'){ STATE.noteEdit=null; render(); }
   else if(act==='note-save'){ var t=el.closest('.noteedit').querySelector('textarea'); saveNote(uri,t?t.value:''); }
-  else if(act==='listen-jump') listenJump(Number(i));
   else if(act==='deep-begin') chooseDeep(i); else if(act==='album-scrobble') albumScrobble(i);
   else if(act==='deep-fmt') beginDeepListen(f); else if(act==='deep-cancel'){ STATE.deep.pending=null; render(); }
   else if(act==='deep-end') endDeepListen(); else if(act==='deep-star') deepStar(no,Number(el.getAttribute('data-n')));
