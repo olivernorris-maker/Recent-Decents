@@ -118,6 +118,27 @@
   .empty{text-align:center;color:var(--ink-3);font-family:'Space Mono',monospace;font-size:12px;letter-spacing:.06em;padding:50px 20px;line-height:1.8}
   .secnote{font-family:'Space Mono',monospace;font-size:10px;color:var(--ink-3);letter-spacing:.04em}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);color:var(--ink);font-size:13px;padding:11px 18px;border-radius:100px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:50;max-width:90%;text-align:center}.toast.show{opacity:1}
+  /* recall — spaced-repetition testing */
+  .rcwrap{padding:18px 14px 6px}
+  .rccard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 20px 20px;text-align:center}
+  .rccount{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-bottom:16px}
+  .rccover{width:208px;max-width:62vw;aspect-ratio:1;margin:0 auto;border-radius:12px;background:#2a2118;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid rgba(0,0,0,.4)}
+  .rccover img{width:100%;height:100%;object-fit:cover;display:block}
+  .rccover .rcq{font-family:'Fraunces',serif;font-style:italic;font-weight:600;font-size:60px;color:rgba(169,159,212,.30)}
+  .rcplay{margin:18px auto 2px;width:62px;height:62px;border-radius:50%;border:1px solid var(--violet-soft);background:var(--violet-soft);color:var(--violet);font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .rcplay.playing{color:var(--accent-ink);border-color:var(--accent);background:var(--accent-soft)}
+  .rcprompt{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);margin-top:14px}
+  .rcreveal{margin-top:16px;font-family:'Space Mono',monospace;font-size:12px;letter-spacing:.07em;text-transform:uppercase;background:transparent;border:1px solid var(--line-2);color:var(--ink);border-radius:100px;padding:12px 28px;cursor:pointer}
+  .rcreveal:hover{border-color:var(--violet);color:var(--violet)}
+  .rcname .ra{font-family:'Fraunces',serif;font-weight:600;font-size:22px;line-height:1.2;margin-top:18px}
+  .rcname .rt{font-size:13px;color:var(--ink-2);margin-top:4px;line-height:1.35}
+  .rcname .ral{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin-top:7px}
+  .rcnote{font-size:12.5px;color:var(--ink-2);line-height:1.5;margin-top:13px;border-left:2px solid var(--line-2);padding-left:10px;text-align:left;white-space:pre-wrap}
+  .rclinks{margin-top:14px;display:flex;justify-content:center}
+  .rcgrades{display:flex;gap:8px;margin-top:18px}
+  .rcgrades button{flex:1;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:14px 4px;border-radius:12px;cursor:pointer;border:1px solid var(--line-2);background:transparent;color:var(--ink-2)}
+  .rcg-knew{color:var(--accent-ink)!important;border-color:var(--accent)!important;background:var(--accent-soft)}
+  .rcg-lodged{color:var(--violet)!important;border-color:var(--violet-soft)!important;background:var(--violet-soft)}
 </style>
 </head>
 <body>
@@ -137,7 +158,8 @@ var STATE={ rows:[], baseline:'', rotation:[], dismissed:[],
   similar:[], similarLoaded:false, similarLoading:false,
   deep:{active:null, pending:null, past:[], pastLoaded:false, openPast:null},
   section:'inbox', statusFilter:'New', addOpen:false, noteEdit:null, deepNoteEdit:null,
-  scrobbleOn:false, ytOn:false, openVid:{}, _cache:{}, _albums:{} };
+  scrobbleOn:false, ytOn:false, openVid:{}, _cache:{}, _albums:{},
+  recall:{queue:[], index:0, loaded:false, loading:false, revealed:false, done:0, playing:false}, recallDue:0 };
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},2600); }
@@ -165,7 +187,7 @@ async function enrichTracks(rows){ try{ if(!rows.length) return; for(var i=0;i<r
 function mapLoved(o){ return {Source:'Loved',Artist:o.artist||'',Track:o.track||'',Album:o.album||'',Year:o.year||'',Duration:o.duration||'',Popularity:'',Genres:'',Plays:0,Listeners:0,URI:mkKey(o.artist,o.track),URL:'',Art:o.art||'',ArtistIds:'',Note:'',YT:''}; }
 async function doSync(btn){ if(btn){ btn.disabled=true; var sv=btn.querySelector('svg'); if(sv) sv.classList.add('spin'); }
   try{ var before=STATE.rows.length;
-    try{ var sheet=await readSheet(); if(sheet){ var sr=(sheet.rows||[]); sr.reverse(); var ss={}, sd=[]; sr.forEach(function(r){ var k=r.URI||mkKey(r.Artist,r.Track); if(!ss[k]){ ss[k]=1; sd.push(r); } }); STATE.rows=sd; if(sheet.rotation) STATE.rotation=sheet.rotation; if(sheet.dismissed) STATE.dismissed=sheet.dismissed; if(sheet.baseline) STATE.baseline=sheet.baseline; render(); } }catch(e){}
+    try{ var sheet=await readSheet(); if(sheet){ var sr=(sheet.rows||[]); sr.reverse(); var ss={}, sd=[]; sr.forEach(function(r){ var k=r.URI||mkKey(r.Artist,r.Track); if(!ss[k]){ ss[k]=1; sd.push(r); } }); STATE.rows=sd; if(sheet.rotation) STATE.rotation=sheet.rotation; if(sheet.dismissed) STATE.dismissed=sheet.dismissed; if(sheet.baseline) STATE.baseline=sheet.baseline; if(typeof sheet.recallDue!=='undefined') STATE.recallDue=sheet.recallDue; render(); } }catch(e){}
     var arrived=Math.max(0, STATE.rows.length-before);
     var sinceUts=STATE.baseline?Math.floor(Date.parse(STATE.baseline)/1000):0;
     var existing={}; STATE.rows.forEach(function(r){ if(r.URI) existing[r.URI]=1; });
@@ -221,6 +243,20 @@ async function runSearch(){ var q=document.getElementById('q').value.trim(); if(
   }catch(e){ box.innerHTML='<p class="meta" style="padding:8px 0">search problem</p>'; } }
 async function addManual(uri){ var m=STATE._cache&&STATE._cache[uri]; if(!m) return; if(STATE.rows.some(function(r){return r.URI===uri;})){ toast('Already saved'); return; } await enrichTracks([m]); m.Status='New'; m.Date=new Date().toISOString().slice(0,10); await writeSheet({action:'add',rows:[m]}); STATE.rows=[m].concat(STATE.rows); toast('Added · '+m.Artist); document.getElementById('q').value=''; document.getElementById('results').innerHTML=''; render(); }
 
+/* one reusable <audio> for Recall previews — kept outside the app render so it survives re-renders
+   and keeps playing when the screen locks (Android). mediaSession gives lock-screen controls;
+   during the BLIND phase the metadata is deliberately generic so the answer isn't spoiled. */
+var rcAudio=null;
+function rcAudioEl(){ if(!rcAudio){ rcAudio=document.createElement('audio'); rcAudio.id='rcaudio'; rcAudio.preload='none'; document.body.appendChild(rcAudio);
+    rcAudio.addEventListener('ended',function(){ STATE.recall.playing=false; var b=document.querySelector('.rcplay'); if(b){ b.classList.remove('playing'); b.innerHTML='\u25B6'; } });
+    if('mediaSession' in navigator){ try{
+      navigator.mediaSession.setActionHandler('play',function(){ rcAudio.play(); });
+      navigator.mediaSession.setActionHandler('pause',function(){ rcAudio.pause(); });
+      navigator.mediaSession.setActionHandler('nexttrack',function(){ if(!STATE.recall.revealed) recallReveal(); });
+    }catch(e){} } }
+  return rcAudio; }
+function rcMeta(title,artist,art){ if(!('mediaSession' in navigator)) return; try{ navigator.mediaSession.metadata=new MediaMetadata({title:title,artist:artist,album:'Recent Decents · Recall',artwork:art?[{src:art,sizes:'300x300',type:'image/jpeg'}]:[]}); }catch(e){} }
+
 /* ---------- Listen (YouTube) ---------- */
 async function resolveVid(row){ if(row.YT) return row.YT; try{ var r=await apiGet('action=ytsearch&q='+encodeURIComponent(firstArtist(row.Artist)+' '+row.Track)); var vid=r&&r.videoId; if(vid){ row.YT=vid; writeSheet({action:'updateYT',uri:row.URI,yt:vid}); } return vid||''; }catch(e){ return ''; } }
 function ytIframe(vid){ return '<iframe class="ytembed" src="https://www.youtube.com/embed/'+encodeURIComponent(vid)+'?autoplay=1&rel=0&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>'; }
@@ -237,6 +273,52 @@ async function toggleVid(uri){
   STATE.openVid[uri]=vid;
   var e3=findCardEl(uri); if(e3){ var w3=e3.querySelector('.cardvid'); if(w3) w3.innerHTML=ytIframe(vid); }
 }
+
+/* ---------- Recall (spaced-repetition testing) ---------- */
+async function loadRecall(){ if(STATE.recall.loading) return; STATE.recall.loading=true; STATE.recall.loaded=true; STATE.recall.queue=[]; STATE.recall.index=0; STATE.recall.revealed=false; STATE.recall.done=0; STATE.recall.playing=false; render();
+  try{ var r=await apiGet('action=recall'); STATE.recall.queue=(r&&r.cards)||[]; STATE.recallDue=(r&&typeof r.due!=='undefined')?r.due:STATE.recall.queue.length; }
+  catch(e){ toast('Could not load recall'); STATE.recall.queue=[]; }
+  finally{ STATE.recall.loading=false; render(); if(STATE.recall.queue.length) recallPrepare(); } }
+function recallCurrent(){ return STATE.recall.queue[STATE.recall.index]||null; }
+
+/* lazily resolve a 30s preview for the current card; falls the card back to cover-recall if none exists */
+async function recallPrepare(){ var c=recallCurrent(); if(!c||c._prepared) return; c._prepared=true;
+  if(c.Preview){ c.mode='audio'; return; }
+  try{ var r=await apiGet('action=preview&uri='+encodeURIComponent(c.URI)+'&q='+encodeURIComponent(firstArtist(c.Artist)+' '+c.Track));
+    if(r&&r.preview){ c.Preview=r.preview; c.mode='audio'; if(r.art&&!c.Art) c.Art=r.art; } else c.mode='cover'; }
+  catch(e){ c.mode='cover'; }
+  if(STATE.section==='recall') render(); }
+
+function recallPlay(){ var c=recallCurrent(); if(!c||!c.Preview) return; var a=rcAudioEl(); var b=document.querySelector('.rcplay');
+  if(STATE.recall.playing){ a.pause(); STATE.recall.playing=false; if(b){ b.classList.remove('playing'); b.innerHTML='\u25B6'; } return; }
+  if(a.src!==c.Preview) a.src=c.Preview;
+  rcMeta(STATE.recall.revealed?c.Track:'Name it\u2026', STATE.recall.revealed?firstArtist(c.Artist):'Recall', STATE.recall.revealed?c.Art:'');
+  a.play().then(function(){ STATE.recall.playing=true; if(b){ b.classList.add('playing'); b.innerHTML='\u275A\u275A'; } }).catch(function(){ toast('Tap play to start audio'); }); }
+
+function recallReveal(){ STATE.recall.revealed=true; var c=recallCurrent(); if(c) rcMeta(c.Track,firstArtist(c.Artist),c.Art); render(); }
+
+function recallGrade(grade){ var c=recallCurrent(); if(!c) return; if(rcAudio){ try{ rcAudio.pause(); }catch(e){} } STATE.recall.playing=false;
+  writeSheet({action:'recallGrade',uri:c.URI,grade:grade}).catch(function(){});
+  STATE.recall.done++; STATE.recallDue=Math.max(0,STATE.recallDue-1); STATE.recall.index++; STATE.recall.revealed=false;
+  toast(grade==='lodged'?'Lodged \u2726':(grade==='knew'?'Knew it':'Back tomorrow'));
+  render(); if(STATE.recall.index<STATE.recall.queue.length) recallPrepare(); }
+
+function recallSectionHTML(){ var R=STATE.recall;
+  if(R.loading) return '<div class="empty">finding what\u2019s due\u2026</div>';
+  if(!R.queue.length) return '<div class="empty">nothing due \u2014 the deck\u2019s resting<br>saved tracks return here as they age</div>';
+  if(R.index>=R.queue.length){ var extra=(STATE.recallDue>0)?(' \u00b7 '+STATE.recallDue+' still due'):'';
+    return '<div class="rcwrap"><div class="rccard"><div class="rccover"><span class="rcq">\u2726</span></div><div class="ra" style="font-family:\'Fraunces\',serif;font-weight:600;font-size:22px;margin-top:18px">Session done</div><div class="rcprompt">'+R.done+' card'+(R.done===1?'':'s')+' reviewed'+extra+'</div><button class="rcreveal" style="margin-top:20px" onclick="loadRecall()">'+(STATE.recallDue>0?'Keep going':'Reload')+'</button></div></div>'; }
+  var c=R.queue[R.index], pos=(R.index+1)+' of '+R.queue.length;
+  var coverInner = R.revealed ? (c.Art?'<img src="'+esc(c.Art)+'" alt="">':'<span class="rcq">'+esc((c.Artist||'?').slice(0,1))+'</span>') : '<span class="rcq">?</span>';
+  var playBtn = (c.mode==='cover') ? '<div class="rcprompt">no preview \u2014 name it from the cover</div>'
+              : '<button class="rcplay'+(R.playing?' playing':'')+'" onclick="recallPlay()">'+(R.playing?'\u275A\u275A':'\u25B6')+'</button>';
+  var top='<div class="rccount">'+pos+'</div><div class="rccover">'+coverInner+'</div>'+playBtn;
+  if(!R.revealed){ var pr=(c.mode==='cover')?'':'<div class="rcprompt">name the artist &amp; track</div>';
+    return '<div class="rcwrap"><div class="rccard">'+top+pr+'<button class="rcreveal" onclick="recallReveal()">Reveal</button></div></div>'; }
+  var note=c.Note?'<div class="rcnote">'+esc(c.Note)+'</div>':'';
+  var name='<div class="rcname"><div class="ra">'+esc(c.Artist)+'</div><div class="rt">'+esc(c.Track)+'</div>'+(c.Album?'<div class="ral">'+esc(c.Album)+'</div>':'')+'</div>'+note;
+  var grades='<div class="rcgrades"><button class="rcg-blank" onclick="recallGrade(\'blank\')">Blank</button><button class="rcg-knew" onclick="recallGrade(\'knew\')">Knew it</button><button class="rcg-lodged" onclick="recallGrade(\'lodged\')">Lodged</button></div>';
+  return '<div class="rcwrap"><div class="rccard">'+top+name+'<div class="rclinks">'+linksHTML({Artist:c.Artist,Track:c.Track})+'</div>'+grades+'</div></div>'; }
 
 /* ---------- Deep Listen ---------- */
 async function loadDeepPast(){ try{ var rows=await apiGet('action=deeplog'); STATE.deep.past=rows||[]; STATE.deep.pastLoaded=true; render(); }catch(e){ STATE.deep.pastLoaded=true; render(); } }
@@ -301,9 +383,10 @@ function deepSectionHTML(){ var d=STATE.deep;
       return '<div class="past" data-act="past-open" data-id="'+esc(id)+'"><div class="pa">'+esc(g.album)+'</div><div class="pm">'+esc(g.artist)+' · '+esc(g.date)+' · '+esc(g.format)+' · '+g.tracks.length+' TRACKS</div></div>'; }).join('')+'</div>'; } }
   return search+past; }
 
-function sectionTabsHTML(c){ var defs=[['inbox','Inbox',false],['rotation','Rotation',false],['picks','Picks',true],['newtome','New to me',true],['similar','Similar',true],['deep','Deep Listen',true]];
+function sectionTabsHTML(c){ var defs=[['inbox','Inbox',false],['rotation','Rotation',false],['recall','Recall',true],['picks','Picks',true],['newtome','New to me',true],['similar','Similar',true],['deep','Deep Listen',true]];
   return defs.map(function(d){ var id=d[0],label=d[1],disc=d[2],ct='';
     if(id==='inbox') ct=c['New']||0; else if(id==='rotation') ct=STATE.rotation.length;
+    else if(id==='recall'){ var rem=STATE.recall.loaded?(STATE.recall.index>=STATE.recall.queue.length?STATE.recallDue:(STATE.recall.queue.length-STATE.recall.index)):STATE.recallDue; ct=rem>0?rem:''; }
     else if(id==='picks') ct=STATE.picksLoaded?STATE.picks.length:''; else if(id==='newtome') ct=STATE.newtomeLoaded?STATE.newtome.length:''; else if(id==='similar') ct=STATE.similarLoaded?STATE.similar.length:'';
     var mark=disc?'\u2726 ':''; return '<button class="tab'+(STATE.section===id?' on':'')+(disc?' disc':'')+'" onclick="goSection(\''+id+'\')">'+mark+esc(label)+(ct!==''?' <span class="ct">'+ct+'</span>':'')+'</button>'; }).join(''); }
 function chipsHTML(c){ return '<div class="chips">'+FILTERS.map(function(f){ var ct=(f==='All')?STATE.rows.length:(c[f]||0); return '<button class="chip'+(STATE.statusFilter===f?' on':'')+'" onclick="setFilter(\''+f+'\')">'+f+' <span class="chipct">'+ct+'</span></button>'; }).join('')+'</div>'; }
@@ -317,18 +400,21 @@ function render(){ var app=document.getElementById('app');
   else if(STATE.section==='picks'){ body='<div class="list">'+(STATE.picksLoading?'<div class="empty">finding this month\u2019s picks…</div>':(!STATE.picks.length?'<div class="empty">no new picks right now<br>everything you\u2019re playing is already sorted</div>':STATE.picks.map(pickCardHTML).join('')))+'</div>'; }
   else if(STATE.section==='newtome'){ body='<div class="list">'+(STATE.newtomeLoading?'<div class="empty">finding new-to-me…</div>':(!STATE.newtome.length?'<div class="empty">nothing new surfaced<br>no recent plays from unfamiliar artists</div>':STATE.newtome.map(newToMeCardHTML).join('')))+'</div>'; }
   else if(STATE.section==='similar'){ body='<div class="list">'+(STATE.similarLoading?'<div class="empty">finding similar artists…</div>':(!STATE.similar.length?'<div class="empty">no fresh similar artists<br>everything close is already in your world</div>':STATE.similar.map(similarCardHTML).join('')))+'</div>'; }
+  else if(STATE.section==='recall'){ body=recallSectionHTML(); }
   else { body=deepSectionHTML(); }
-  var dock=(STATE.section==='deep')?'':'<div class="dock"><button class="add-toggle" onclick="STATE.addOpen=!STATE.addOpen;render()">+ Add a track</button><div class="add-panel'+(STATE.addOpen?' open':'')+'"><div class="search-row"><input id="q" placeholder="Artist or track…" onkeydown="if(event.key===\'Enter\')runSearch()"><button onclick="runSearch()">Search</button></div><div class="results" id="results"></div></div><div class="tools"><button onclick="checkConnection()">Check connection</button><button onclick="resetBaseline()">Reset start point</button></div></div>';
+  var dock=(STATE.section==='deep'||STATE.section==='recall')?'':'<div class="dock"><button class="add-toggle" onclick="STATE.addOpen=!STATE.addOpen;render()">+ Add a track</button><div class="add-panel'+(STATE.addOpen?' open':'')+'"><div class="search-row"><input id="q" placeholder="Artist or track…" onkeydown="if(event.key===\'Enter\')runSearch()"><button onclick="runSearch()">Search</button></div><div class="results" id="results"></div></div><div class="tools"><button onclick="checkConnection()">Check connection</button><button onclick="resetBaseline()">Reset start point</button></div></div>';
   app.innerHTML='<div class="face"><div class="face-top"><div><div class="wordmark" onclick="goSection(\'inbox\')" style="cursor:pointer" title="Home — Inbox">Recent Decents</div><div class="sub">discovery inbox</div></div><button class="sync-btn" onclick="doSync(this)"><svg viewBox="0 0 16 16" fill="none"><path d="M14 8a6 6 0 1 1-1.8-4.3M14 2v3.5h-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Sync</button></div></div><div class="tabs">'+sectionTabsHTML(c)+'</div>'+chipBar+body+dock;
   if(STATE.noteEdit||STATE.deepNoteEdit){ var ta=document.querySelector('textarea[data-noteinput]'); if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); } }
 }
 
 function goSection(s){
+  if(STATE.section==='recall' && s!=='recall' && rcAudio){ try{ rcAudio.pause(); }catch(e){} STATE.recall.playing=false; }
   if(s==='inbox') STATE.statusFilter='New';
   STATE.section=s; STATE.deep.openPast=null; render();
   if(s==='picks' && !STATE.picksLoading) loadPicks();
   if(s==='newtome' && !STATE.newtomeLoading) loadNewToMe();
   if(s==='similar' && !STATE.similarLoading) loadSimilar();
+  if(s==='recall' && !STATE.recall.loaded && !STATE.recall.loading) loadRecall();
   if(s==='deep' && !STATE.deep.active && !STATE.deep.pastLoaded) loadDeepPast();
 }
 function setFilter(f){ STATE.statusFilter=f; render(); }
@@ -357,7 +443,7 @@ function resetBaseline(){ if(!confirm('Reset the "start from now" point?')) retu
 
 (function(){ var app=document.getElementById('app'); app.addEventListener('click',appClick); app.addEventListener('change',appChange); })();
 (async function(){ if(APPS_SCRIPT_URL.indexOf('PASTE_')===0){ render(); return; }
-  try{ var d=await readSheet(); var rows=(d&&d.rows)||[]; rows.reverse(); var seen={},dd=[]; rows.forEach(function(r){ var k=r.URI||mkKey(r.Artist,r.Track); if(!seen[k]){ seen[k]=1; dd.push(r); } }); STATE.rows=dd; STATE.baseline=(d&&d.baseline)||''; STATE.rotation=(d&&d.rotation)||[]; STATE.dismissed=(d&&d.dismissed)||[]; }catch(e){}
+  try{ var d=await readSheet(); var rows=(d&&d.rows)||[]; rows.reverse(); var seen={},dd=[]; rows.forEach(function(r){ var k=r.URI||mkKey(r.Artist,r.Track); if(!seen[k]){ seen[k]=1; dd.push(r); } }); STATE.rows=dd; STATE.baseline=(d&&d.baseline)||''; STATE.rotation=(d&&d.rotation)||[]; STATE.dismissed=(d&&d.dismissed)||[]; STATE.recallDue=(d&&d.recallDue)||0; }catch(e){}
   render(); if(STATE.baseline) runExpiry();
   try{ var p=await apiGet('action=ping'); STATE.scrobbleOn=!!(p&&p.scrobble); STATE.ytOn=!!(p&&p.youtube); }catch(e){}
 })();
